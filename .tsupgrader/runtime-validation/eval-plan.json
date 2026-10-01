@@ -23,8 +23,13 @@
       "name": "dashboard-home-200",
       "kind": "http-probe",
       "startCommand": "npm",
+<<<<<<< HEAD
       "startArgs": ["run", "dev:frontend", "--", "--port", "3100"],
       "url": "http://localhost:3100/",
+=======
+      "startArgs": ["run", "dev", "--", "--port", "3101"],
+      "url": "http://localhost:3101/",
+>>>>>>> 9b09afc (fix: convert frontend to regular directory)
       "verificationMethod": "http-status",
       "expected": "200",
       "timeoutSeconds": 120
