@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SIG Jawa Tengah
 
-## Getting Started
+Dashboard WebGIS untuk menjelajahi batas administratif Jawa Tengah, mencari wilayah, dan melihat analisis statistik.
 
-First, run the development server:
+## Struktur proyek
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```text
+app/          Halaman, UI dashboard, API proxy, dan stylesheet Next.js
+backend/      API FastAPI, model database, skema, dan migrasi Alembic
+public/       Aset publik, termasuk GeoJSON kabupaten/kota Jawa Tengah
+tests/        Tes aset peta dan dashboard
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Menjalankan aplikasi
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Gunakan Node.js 20.9 atau lebih baru dan Python 3.10.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```powershell
+npm install
+py -3.10 -m venv backend/venv
+.\backend\venv\Scripts\python.exe -m pip install -r backend/requirements.txt
+```
 
-## Learn More
+Atur `DATABASE_URL` pada `backend/.env` sesuai database lokal. Setelah backend siap:
 
-To learn more about Next.js, take a look at the following resources:
+```powershell
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Frontend berjalan pada `http://localhost:3000`; API berjalan pada port `8080`. Script terpisah tersedia sebagai `npm run dev:frontend` dan `npm run dev:backend`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Memeriksa proyek
 
-## Deploy on Vercel
+```powershell
+npm run build
+npm run lint
+npm test
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Peta saat ini menggunakan geometri kabupaten/kota dari GeoJSON di `public/`. Dataset anggota, suara, dan penduduk belum menjadi data backend; mode Admin menerima CSV sebagai pratinjau sementara di browser, bukan penyimpanan permanen.
