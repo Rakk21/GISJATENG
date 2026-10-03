@@ -1,13 +1,22 @@
+from pathlib import Path
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# .env ada di backend/.env, tapi uvicorn bisa dijalankan dari root
+_env_path = Path(__file__).resolve().parents[2] / ".env"
 
 
 class Settings(BaseSettings):
     database_url: str
 
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(
+        env_file=str(_env_path),
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
 
 settings = Settings()

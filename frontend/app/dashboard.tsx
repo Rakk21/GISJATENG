@@ -248,11 +248,11 @@ function RegionMap({
               normalizeName(String(feature?.properties?.KABUPATEN ?? "")) ===
               normalizeName(selectedRef.current ?? "");
             return {
-              color: isSelected ? "#156b5b" : "#47796e",
-              weight: isSelected ? 2.8 : 1.3,
+              color: isSelected ? "#2e5d4f" : "#8aa89a",
+              weight: isSelected ? 2 : 1,
               opacity: 1,
-              fillColor: isSelected ? "#4fa38c" : "#b8d8c9",
-              fillOpacity: isSelected ? 0.76 : 0.55,
+              fillColor: isSelected ? "#a9c6b6" : "#dde8e1",
+              fillOpacity: isSelected ? 0.72 : 0.42,
             };
           },
           onEachFeature(feature, polygon) {
@@ -266,15 +266,15 @@ function RegionMap({
             });
             polygon.on({
               click: () => onSelectRef.current(name),
-              mouseover: () => path.setStyle({ color: "#145e50", weight: 2.5, fillOpacity: 0.78 }),
+              mouseover: () => path.setStyle({ color: "#2e5d4f", weight: 1.8, fillOpacity: 0.6 }),
               mouseout: () => {
                 const isSelected =
                   normalizeName(name) === normalizeName(selectedRef.current ?? "");
                 path.setStyle({
-                  color: isSelected ? "#156b5b" : "#47796e",
-                  weight: isSelected ? 2.8 : 1.3,
-                  fillColor: isSelected ? "#4fa38c" : "#b8d8c9",
-                  fillOpacity: isSelected ? 0.76 : 0.55,
+                  color: isSelected ? "#2e5d4f" : "#8aa89a",
+                  weight: isSelected ? 2 : 1,
+                  fillColor: isSelected ? "#a9c6b6" : "#dde8e1",
+                  fillOpacity: isSelected ? 0.72 : 0.42,
                 });
               },
             });
@@ -308,10 +308,10 @@ function RegionMap({
       const isSelected =
         normalizeName(String(feature?.properties?.KABUPATEN ?? "")) === selected;
       return {
-        color: isSelected ? "#156b5b" : "#47796e",
-        weight: isSelected ? 2.8 : 1.3,
-        fillColor: isSelected ? "#4fa38c" : "#b8d8c9",
-        fillOpacity: isSelected ? 0.76 : 0.55,
+        color: isSelected ? "#2e5d4f" : "#8aa89a",
+        weight: isSelected ? 2 : 1,
+        fillColor: isSelected ? "#a9c6b6" : "#dde8e1",
+        fillOpacity: isSelected ? 0.72 : 0.42,
       };
     });
   }, [selectedRegion]);
@@ -328,17 +328,17 @@ function RegionMap({
     <div className="geo-map-frame">
       <div className="geo-map-stamp">
         <span className="geo-live-dot" />
-        <span>JAWA TENGAH</span>
+        <span>Jawa Tengah</span>
         <i />
-        <span>35 KABUPATEN / KOTA</span>
+        <span>35 kabupaten / kota</span>
       </div>
       <button className="geo-map-focus" type="button" onClick={focusProvince}>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5M3 3l5 5m9-5-5 5m5 9-5-5m-9 5 5-5" /></svg>
-        Fokus provinsi
+        Lihat seluruh provinsi
       </button>
       <div ref={mapElement} className="geo-map-canvas" aria-label="Peta batas kabupaten dan kota Jawa Tengah" />
       {mapError && <p className="geo-map-error" role="alert">{mapError}</p>}
-      <div className="geo-map-legend"><span /><span>Batas kabupaten / kota</span><b /><span>Wilayah dipilih</span></div>
+      <div className="geo-map-legend"><span /><span>Batas wilayah</span><b /><span>Dipilih</span></div>
     </div>
   );
 }
@@ -496,23 +496,23 @@ export default function Dashboard() {
   return (
     <div className="geo-dashboard">
       <header className="geo-topbar">
-        <a className="geo-brand" href="#geo-overview" aria-label="SIG Jawa Tengah, beranda">
+        <a className="geo-brand" href="#geo-overview" aria-label="Ruang Wilayah Jawa Tengah, beranda">
           <span className="geo-brand-symbol"><i /><i /><i /></span>
-          <span><strong>RUANGWILAYAH</strong><small>JAWA TENGAH · INSIGHT</small></span>
+          <span><strong>Ruang Wilayah</strong><small>Jawa Tengah</small></span>
         </a>
-        <nav className="geo-nav" aria-label="Navigasi dashboard">
+        <nav className="geo-nav" aria-label="Navigasi">
           <a href="#geo-overview">Ringkasan</a>
-          <a href="#geo-map-section">Peta wilayah</a>
+          <a href="#geo-map-section">Peta</a>
           <a href="#geo-insights">Analisis</a>
           <a href="#geo-directory">Direktori</a>
         </nav>
         <div className="geo-header-actions">
           <span className={`geo-api-status ${apiError ? "is-offline" : ""}`}>
-            <i />{loading ? "Menghubungkan" : apiError ? "API belum terhubung" : "Data wilayah aktif"}
+            <i />{loading ? "Memuat data…" : apiError ? "Butuh sambungan API" : "Data siap"}
           </span>
-          <div className="geo-view-switch" role="group" aria-label="Tampilan dashboard">
-            <button type="button" className={view === "pengguna" ? "is-active" : ""} onClick={() => setView("pengguna")}>Pengguna</button>
-            <button type="button" className={view === "admin" ? "is-active" : ""} onClick={() => setView("admin")}>Admin</button>
+          <div className="geo-view-switch" role="group" aria-label="Mode tampilan">
+            <button type="button" className={view === "pengguna" ? "is-active" : ""} onClick={() => setView("pengguna")}>Lihat</button>
+            <button type="button" className={view === "admin" ? "is-active" : ""} onClick={() => setView("admin")}>Kelola</button>
           </div>
         </div>
       </header>
@@ -520,28 +520,26 @@ export default function Dashboard() {
       <main className="geo-main">
         <section className="geo-intro" id="geo-overview">
           <div>
-            <p className="geo-eyebrow"><span /> PLATFORM ANALISIS WILAYAH</p>
-            <h1>Data lokal,<br /><em>perspektif lebih luas.</em></h1>
-            <p className="geo-intro-copy">Jelajahi wilayah, pahami sebaran, dan temukan insight Jawa Tengah dalam satu ruang kerja.</p>
+            <p className="geo-eyebrow"><span /> Jawa Tengah — peta & data</p>
+            <h1>Memahami wilayah,<br /><em>dengan lebih tenang.</em></h1>
+            <p className="geo-intro-copy">Satu ruang untuk melihat batas wilayah, membandingkan sebaran, dan menelusuri direktori Jawa Tengah tanpa bising.</p>
           </div>
           <div className="geo-intro-note">
-            <span>CAKUPAN SAAT INI</span>
+            <span>Cakupan</span>
             <strong>Jawa Tengah</strong>
-            <small>35 wilayah · peta administratif</small>
+            <small>35 kabupaten / kota · peta administratif</small>
           </div>
         </section>
 
-        <section className="geo-scope-strip" aria-label="Cakupan data wilayah">
+        <section className="geo-scope-strip" aria-label="Cakupan data">
           {[
-            { label: "Dapil RI", available: false, waitingForApi: false },
-            { label: "Dapil Provinsi", available: false, waitingForApi: false },
             { label: "Kabupaten / kota", available: countyCount > 0, waitingForApi: loading || apiError },
             { label: "Kecamatan", available: districtCount > 0, waitingForApi: loading || apiError },
             { label: "Desa / kelurahan", available: false, waitingForApi: false },
           ].map((item) => (
             <div className="geo-scope-item" key={item.label}>
-              <span className={item.available ? "is-ready" : ""}>{item.available ? "✓" : "—"}</span>
-              <div><strong>{item.label}</strong><small>{item.available ? "Tersedia di master" : item.waitingForApi ? (loading ? "Menghubungkan API" : "API belum terhubung") : "Belum tersedia"}</small></div>
+              <span className={item.available ? "is-ready" : ""}>{item.available ? "✓" : "·"}</span>
+              <div><strong>{item.label}</strong><small>{item.available ? "Tersedia" : item.waitingForApi ? (loading ? "Memuat…" : "Belum terhubung") : "Segera"}</small></div>
             </div>
           ))}
         </section>
@@ -549,10 +547,10 @@ export default function Dashboard() {
         {view === "admin" && (
           <section className="geo-admin-panel" aria-labelledby="geo-admin-title">
             <div className="geo-admin-copy">
-              <p className="geo-eyebrow">RUANG ADMIN · IMPOR DATA</p>
-              <h2 id="geo-admin-title">Perbarui sumber analisis.</h2>
-              <p>Impor CSV berisi wilayah, tingkat, anggota, suara, dan penduduk. Pratinjau tidak dikirim ke server atau disimpan permanen.</p>
-              <small>Header contoh: <code>wilayah, tingkat, anggota, suara, penduduk</code></small>
+              <p className="geo-eyebrow">Kelola data</p>
+              <h2 id="geo-admin-title">Impor CSV untuk pratinjau analisis</h2>
+              <p>Unggah tabel berisi wilayah, tingkat, anggota, suara, dan penduduk. Data hanya tampil di peramban dan tidak tersimpan permanen.</p>
+              <small>Contoh header: <code>wilayah, tingkat, anggota, suara, penduduk</code></small>
             </div>
             <div className="geo-import-actions">
               <input
@@ -560,15 +558,15 @@ export default function Dashboard() {
                 className="geo-file-input"
                 type="file"
                 accept=".csv,text/csv"
-                aria-label="Pilih file CSV data statistik"
+                aria-label="Pilih file CSV"
                 onChange={(event) => void importCsv(event.currentTarget.files?.[0])}
               />
               <button className="geo-import-button" type="button" onClick={() => importInput.current?.click()}>
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 13V3m0 0L6 7m4-4 4 4M4 12v4h12v-4" /></svg>
-                Pilih file CSV
+                Pilih file
               </button>
               {fileName && <span className="geo-file-name">{fileName}</span>}
-              {uploadedRows.length > 0 && <button className="geo-clear-button" type="button" onClick={clearImport}>Hapus pratinjau</button>}
+              {uploadedRows.length > 0 && <button className="geo-clear-button" type="button" onClick={clearImport}>Bersihkan</button>}
             </div>
             {importMessage && <p className={`geo-import-message ${importError ? "is-error" : ""}`} role={importError ? "alert" : "status"}>{importMessage}</p>}
           </section>
@@ -577,13 +575,13 @@ export default function Dashboard() {
         <form className="geo-query" onSubmit={submitQuery}>
           <div className="geo-query-input">
             <span className="geo-search-icon" aria-hidden="true">⌕</span>
-            <label htmlFor="geo-query-input">TANYAKAN DATA WILAYAH</label>
+            <label htmlFor="geo-query-input">Cari wilayah</label>
             <input
               id="geo-query-input"
               type="search"
               value={query}
               onChange={(event) => { setQuery(event.target.value); setQueryMessage(""); }}
-              placeholder="Cari wilayah atau ketik “anggota terbanyak”"
+              placeholder="Cari kabupaten, kecamatan, atau coba “anggota terbanyak”"
               autoComplete="off"
             />
             {regionMatches.length > 0 && normalizeName(query) !== normalizeName(selectedRegion?.nama ?? "") && (
@@ -597,21 +595,21 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-          <button className="geo-query-submit" type="submit">Jalankan analisis <span>↗</span></button>
+          <button className="geo-query-submit" type="submit">Cari <span>→</span></button>
           {queryMessage && <p className="geo-query-message" role="status">{queryMessage}</p>}
         </form>
 
-        <section className="geo-kpi-grid" aria-label="Ringkasan ketersediaan data">
-          <article className="geo-kpi geo-kpi-primary"><span>WILAYAH TERPETAKAN</span><strong>35</strong><small>kabupaten / kota · GeoJSON Jawa Tengah</small><i>01</i></article>
-          <article className="geo-kpi"><span>KABUPATEN / KOTA</span><strong>{loading || apiError ? "—" : numberFormat.format(countyCount)}</strong><small>{apiError ? "API wilayah belum terhubung" : "data administrasi tersedia"}</small><i>02</i></article>
-          <article className="geo-kpi"><span>KECAMATAN</span><strong>{loading || apiError ? "—" : numberFormat.format(districtCount)}</strong><small>{apiError ? "API wilayah belum terhubung" : "tanpa batas geometri"}</small><i>03</i></article>
-          <article className="geo-kpi"><span>PARTAI TERDAFTAR</span><strong>{loading || apiError ? "—" : numberFormat.format(activePartyCount)}</strong><small>{apiError ? "API belum terhubung" : "data organisasi terhubung"}</small><i>04</i></article>
+        <section className="geo-kpi-grid" aria-label="Ringkasan">
+          <article className="geo-kpi geo-kpi-primary"><span>Wilayah terpetakan</span><strong>35</strong><small>kabupaten / kota · batas GeoJSON</small><i>01</i></article>
+          <article className="geo-kpi"><span>Kabupaten / kota</span><strong>{loading || apiError ? "—" : numberFormat.format(countyCount)}</strong><small>{apiError ? "Menunggu sambungan API" : "Siap digunakan"}</small><i>02</i></article>
+          <article className="geo-kpi"><span>Kecamatan</span><strong>{loading || apiError ? "—" : numberFormat.format(districtCount)}</strong><small>{apiError ? "Menunggu sambungan API" : "Daftar tersedia"}</small><i>03</i></article>
+          <article className="geo-kpi"><span>Partai terdaftar</span><strong>{loading || apiError ? "—" : numberFormat.format(activePartyCount)}</strong><small>{apiError ? "Menunggu sambungan API" : "Terhubung"}</small><i>04</i></article>
         </section>
 
         <section className="geo-map-section" id="geo-map-section">
           <div className="geo-section-heading">
-            <div><p className="geo-eyebrow">01 / PETA INTERAKTIF</p><h2>Jawa Tengah <span>tanpa distraksi.</span></h2></div>
-            <span className="geo-map-caption">PILIH KABUPATEN / KOTA UNTUK MELIHAT DETAIL</span>
+            <div><p className="geo-eyebrow">Peta</p><h2>Jawa Tengah <span>yang bisa dijelajahi</span></h2></div>
+            <span className="geo-map-caption">Klik kabupaten / kota untuk detail</span>
           </div>
           <RegionMap selectedRegion={selectedMapName} onSelect={(name) => {
             const matched = regions.find((region) => normalizeName(region.nama) === normalizeName(name));
@@ -628,40 +626,40 @@ export default function Dashboard() {
               setQueryMessage("Wilayah dipilih dari geometri peta; data statistiknya belum terhubung ke master API.");
             }
           }} />
-          <p className="geo-map-footnote">Peta hanya menampilkan batas administratif Jawa Tengah. Basemap, tutupan hutan, dan wilayah luar provinsi tidak ditampilkan.</p>
+          <p className="geo-map-footnote">Hanya batas administratif Jawa Tengah. Tidak ada basemap atau tutupan lahan tambahan — sengaja dibuat sederhana agar fokus.</p>
         </section>
 
         <section className="geo-selected-panel" aria-live="polite">
           <div className="geo-selected-title">
             <div className="geo-selected-marker"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 18s6-5.1 6-10a6 6 0 1 0-12 0c0 4.9 6 10 6 10Z" /><circle cx="10" cy="8" r="2" /></svg></div>
-            <div><span>WILAYAH TERPILIH</span><h2>{selectedRegion?.nama ?? "Seluruh Jawa Tengah"}</h2></div>
+            <div><span>Wilayah terpilih</span><h2>{selectedRegion?.nama ?? "Seluruh Jawa Tengah"}</h2></div>
           </div>
           <div className="geo-selected-facts">
-            <div><span>TINGKAT</span><strong>{selectedRegion?.tingkat.replaceAll("_", " ") ?? "Provinsi"}</strong></div>
-            <div><span>WILAYAH INDUK</span><strong>{selectedParent?.nama ?? (selectedRegion?.tingkat === "kabupaten_kota" ? "Jawa Tengah" : "—")}</strong></div>
-            <div><span>DATA STATISTIK</span><strong>{uploadedRows.length ? "Pratinjau CSV" : "Belum terhubung"}</strong></div>
+            <div><span>Tingkat</span><strong>{selectedRegion?.tingkat.replaceAll("_", " ") ?? "Provinsi"}</strong></div>
+            <div><span>Induk</span><strong>{selectedParent?.nama ?? (selectedRegion?.tingkat === "kabupaten_kota" ? "Jawa Tengah" : "—")}</strong></div>
+            <div><span>Status data</span><strong>{uploadedRows.length ? "Pratinjau CSV" : "Contoh"}</strong></div>
           </div>
           {selectedRegion?.tingkat === "kecamatan" && !uploadedRows.length && (
-            <p className="geo-district-note">Nama kecamatan tersedia di master; poligon kecamatan belum tersedia, sehingga batas kabupaten/kota tetap ditampilkan.</p>
+            <p className="geo-district-note">Kecamatan ada di daftar, tapi poligonnya belum tersedia — peta tetap menampilkan batas kabupaten/kota.</p>
           )}
           <button type="button" className="geo-clear-selection" onClick={() => { setSelectedRegion(null); setQuery(""); setQueryMessage(""); }}>Tampilkan semua</button>
         </section>
 
         <section className="geo-insights" id="geo-insights" ref={insightsRef}>
           <div className="geo-section-heading geo-insights-heading">
-            <div><p className="geo-eyebrow">02 / ANALISIS WILAYAH</p><h2>Temukan pola <span>di balik data.</span></h2></div>
-            <span className={`geo-data-badge ${isDemo ? "is-demo" : "is-live"}`}>{isDemo ? "SIMULASI · BUKAN DATA AKTUAL" : "PRATINJAU CSV · BELUM TERSIMPAN"}</span>
+            <div><p className="geo-eyebrow">Analisis</p><h2>Lihat sebarannya <span>sekilas</span></h2></div>
+            <span className={`geo-data-badge ${isDemo ? "is-demo" : "is-live"}`}>{isDemo ? "Contoh · bukan data asli" : "Pratinjau CSV"}</span>
           </div>
           <div className="geo-filter-row">
-            <label><span>JENIS DATA</span><select value={metric} onChange={(event) => setMetric(event.target.value as Metric)}><option value="anggota">Anggota</option><option value="suara">Suara</option><option value="penduduk">Penduduk</option></select></label>
-            <label><span>TINGKAT WILAYAH</span><select value={level} onChange={(event) => setLevel(event.target.value as RegionLevel)}><option value="kecamatan">Kecamatan</option><option value="kabupaten_kota">Kabupaten / kota</option></select></label>
-            <div className="geo-sort-chip"><span className="geo-sort-arrow">↓</span><span>URUTAN</span><strong>Terbanyak</strong></div>
-            <p>Hasil tertinggi untuk {metricLabels[metric].toLocaleLowerCase("id-ID")} berdasarkan wilayah.</p>
+            <label><span>Jenis data</span><select value={metric} onChange={(event) => setMetric(event.target.value as Metric)}><option value="anggota">Anggota</option><option value="suara">Suara</option><option value="penduduk">Penduduk</option></select></label>
+            <label><span>Tingkat</span><select value={level} onChange={(event) => setLevel(event.target.value as RegionLevel)}><option value="kecamatan">Kecamatan</option><option value="kabupaten_kota">Kabupaten / kota</option></select></label>
+            <div className="geo-sort-chip"><span className="geo-sort-arrow">↓</span><span>Urut</span><strong>Terbanyak</strong></div>
+            <p>Menampilkan wilayah dengan {metricLabels[metric].toLocaleLowerCase("id-ID")} tertinggi.</p>
           </div>
 
           <div className="geo-analysis-grid">
             <article className="geo-chart-card">
-              <div className="geo-card-heading"><div><p className="geo-eyebrow">PERINGKAT WILAYAH</p><h3>{metricLabels[metric]} terbanyak</h3></div><span>TOP 5</span></div>
+              <div className="geo-card-heading"><div><p className="geo-eyebrow">Peringkat</p><h3>{metricLabels[metric]} terbanyak</h3></div><span>5 teratas</span></div>
               {chartRows.length > 0 ? (
                 <div className="geo-bar-list" role="list" aria-label={`Lima wilayah dengan ${metricLabels[metric].toLocaleLowerCase("id-ID")} terbanyak`}>
                   {chartRows.map((row, index) => (
@@ -672,34 +670,34 @@ export default function Dashboard() {
                   ))}
                 </div>
               ) : <p className="geo-empty-chart">Belum ada baris {level === "kecamatan" ? "kecamatan" : "kabupaten/kota"} di file CSV ini.</p>}
-              <div className="geo-card-foot"><span className="geo-foot-dot" />{isDemo ? "Angka contoh untuk pratinjau desain" : `${numberFormat.format(chartRows.length)} wilayah dari pratinjau CSV`}</div>
+              <div className="geo-card-foot"><span className="geo-foot-dot" />{isDemo ? "Angka contoh untuk pratinjau" : `${numberFormat.format(chartRows.length)} wilayah dari pratinjau`}</div>
             </article>
 
             <article className="geo-insight-card">
-              <div className="geo-card-heading"><div><p className="geo-eyebrow">BACAAN CEPAT</p><h3>Gambaran analisis</h3></div><span className="geo-insight-icon">✳</span></div>
+              <div className="geo-card-heading"><div><p className="geo-eyebrow">Catatan</p><h3>Sekilas analisis</h3></div><span className="geo-insight-icon">✳</span></div>
               <div className="geo-insight-copy">
-                <span>{isDemo ? "CONTOH PERTANYAAN" : "HASIL FILTER"}</span>
+                <span>{isDemo ? "Contoh" : "Ringkasan"}</span>
                 <strong>{metricLabels[metric]} {level === "kecamatan" ? "kecamatan" : "kabupaten / kota"} terbanyak</strong>
-                <p>{isDemo ? "Unggah dataset resmi melalui mode Admin untuk menemukan peringkat wilayah yang sesungguhnya." : "Peringkat dihitung dari nilai yang terdapat pada CSV sementara."}</p>
+                <p>{isDemo ? "Impor CSV di mode Kelola untuk melihat peringkat dari data sebenarnya." : "Peringkat dihitung dari CSV yang kamu unggah di sesi ini."}</p>
               </div>
-              <div className="geo-insight-tags"><span>Marketing</span><span>Kompetitor</span><span>Suara</span></div>
-              <div className="geo-card-foot"><span className="geo-foot-dot" />{uploadedRows.length ? `${numberFormat.format(uploadedRows.length)} baris · sesi saat ini` : "Dataset anggota, suara, penduduk belum diimpor"}</div>
+              <div className="geo-insight-tags"><span>Anggota</span><span>Suara</span><span>Penduduk</span></div>
+              <div className="geo-card-foot"><span className="geo-foot-dot" />{uploadedRows.length ? `${numberFormat.format(uploadedRows.length)} baris · sesi ini` : "Belum ada CSV yang diimpor"}</div>
             </article>
           </div>
         </section>
 
         <section className="geo-directory" id="geo-directory">
           <div className="geo-section-heading">
-            <div><p className="geo-eyebrow">03 / DIREKTORI ADMINISTRATIF</p><h2>Jelajahi wilayah <span>Jawa Tengah.</span></h2></div>
-            <span className="geo-directory-count">{loading ? "Memuat..." : apiError ? "API belum terhubung" : `${numberFormat.format(directoryRows.length)} wilayah`}</span>
+            <div><p className="geo-eyebrow">Direktori</p><h2>Telusuri <span>Jawa Tengah</span></h2></div>
+            <span className="geo-directory-count">{loading ? "Memuat…" : apiError ? "Butuh sambungan API" : `${numberFormat.format(directoryRows.length)} wilayah`}</span>
           </div>
           <div className="geo-directory-controls">
-            <label htmlFor="geo-directory-level">TAMPILKAN</label>
+            <label htmlFor="geo-directory-level">Tampilkan</label>
             <select id="geo-directory-level" value={level} onChange={(event) => setLevel(event.target.value as RegionLevel)}>
               <option value="kecamatan">Kecamatan</option>
               <option value="kabupaten_kota">Kabupaten / kota</option>
             </select>
-            <span>{level === "kecamatan" ? "Pilih kabupaten/kota pada peta untuk menyaring kecamatannya." : "Semua batas kabupaten/kota Jawa Tengah."}</span>
+            <span>{level === "kecamatan" ? "Pilih kabupaten/kota di peta untuk melihat kecamatannya." : "Semua kabupaten/kota di Jawa Tengah."}</span>
           </div>
           <div className="geo-region-list">
             {directoryRows.slice(0, 24).map((region) => (
@@ -717,8 +715,8 @@ export default function Dashboard() {
         </section>
 
         <footer className="geo-footer">
-          <span><strong>RUANGWILAYAH</strong> · SISTEM INFORMASI GEOGRAFIS JAWA TENGAH</span>
-          <span>GEOMETRI: GeoJSON · STATISTIK: {uploadedRows.length ? "PRATINJAU SEMENTARA" : "MENUNGGU DATA AKTUAL"}</span>
+          <span><strong>Ruang Wilayah</strong> · Jawa Tengah</span>
+          <span>Geometri GeoJSON · {uploadedRows.length ? "Statistik dari pratinjau CSV" : "Statistik menunggu data"}</span>
         </footer>
       </main>
     </div>
