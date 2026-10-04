@@ -10,6 +10,8 @@ _env_path = Path(__file__).resolve().parents[2] / ".env"
 
 class Settings(BaseSettings):
     database_url: str
+    secret_key: str = "dev-secret-change-me"
+    access_token_expire_minutes: int = 720
 
     model_config = SettingsConfigDict(
         env_file=str(_env_path),

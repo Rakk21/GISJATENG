@@ -5,6 +5,15 @@ from sqlalchemy import text
 from app.core.database import engine
 from app.api.routes.partai import router as partai_router
 from app.api.routes.wilayah import router as wilayah_router
+from app.api.routes.penduduk import router as penduduk_router
+from app.api.routes.jumlah_pemilih import router as pemilih_router
+from app.api.routes.suara_partai import router as suara_router
+from app.api.routes.anggota_partai import router as anggota_router
+from app.api.routes.auth import router as auth_router
+from app.api.routes.dapil import router as dapil_router
+from app.api.routes.users_admin import router as users_router
+from app.api.routes.analisis import router as analisis_router
+from app.api.routes.export_data import router as export_router
 
 
 app = FastAPI(
@@ -22,8 +31,17 @@ app.add_middleware(
 )
 
 
+app.include_router(auth_router)
+app.include_router(dapil_router)
+app.include_router(users_router)
+app.include_router(analisis_router)
+app.include_router(export_router)
 app.include_router(partai_router)
 app.include_router(wilayah_router)
+app.include_router(penduduk_router)
+app.include_router(pemilih_router)
+app.include_router(suara_router)
+app.include_router(anggota_router)
 
 @app.get("/")
 def root():

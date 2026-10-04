@@ -495,7 +495,7 @@ export default function Dashboard() {
 
   return (
     <div className="geo-dashboard">
-      <header className="geo-topbar">
+        <header className="geo-topbar">
         <a className="geo-brand" href="#geo-overview" aria-label="Ruang Wilayah Jawa Tengah, beranda">
           <span className="geo-brand-symbol"><i /><i /><i /></span>
           <span><strong>Ruang Wilayah</strong><small>Jawa Tengah</small></span>
@@ -505,15 +505,13 @@ export default function Dashboard() {
           <a href="#geo-map-section">Peta</a>
           <a href="#geo-insights">Analisis</a>
           <a href="#geo-directory">Direktori</a>
+          <a href="/admin">Admin</a>
         </nav>
         <div className="geo-header-actions">
           <span className={`geo-api-status ${apiError ? "is-offline" : ""}`}>
             <i />{loading ? "Memuat data…" : apiError ? "Butuh sambungan API" : "Data siap"}
           </span>
-          <div className="geo-view-switch" role="group" aria-label="Mode tampilan">
-            <button type="button" className={view === "pengguna" ? "is-active" : ""} onClick={() => setView("pengguna")}>Lihat</button>
-            <button type="button" className={view === "admin" ? "is-active" : ""} onClick={() => setView("admin")}>Kelola</button>
-          </div>
+          <a href="/admin" className="geo-view-switch" style={{ textDecoration: "none", padding: "6px 12px", borderRadius: 999, border: "1px solid var(--geo-line)", background: "#fff", color: "var(--geo-ink)", fontSize: 12, fontWeight: 600 }}>Kelola data →</a>
         </div>
       </header>
 
@@ -548,11 +546,12 @@ export default function Dashboard() {
           <section className="geo-admin-panel" aria-labelledby="geo-admin-title">
             <div className="geo-admin-copy">
               <p className="geo-eyebrow">Kelola data</p>
-              <h2 id="geo-admin-title">Impor CSV untuk pratinjau analisis</h2>
-              <p>Unggah tabel berisi wilayah, tingkat, anggota, suara, dan penduduk. Data hanya tampil di peramban dan tidak tersimpan permanen.</p>
-              <small>Contoh header: <code>wilayah, tingkat, anggota, suara, penduduk</code></small>
+              <h2 id="geo-admin-title">Kelola di halaman Admin</h2>
+              <p>Halaman <a href="/admin" style={{ textDecoration: "underline" }}>/admin</a> kini terpisah — kelola penduduk, pemilih, suara 2024, dan anggota di sana. Tombol di bawah hanya pratinjau CSV lokal.</p>
+              <small>Contoh header CSV: <code>wilayah, tingkat, anggota, suara, penduduk</code></small>
             </div>
             <div className="geo-import-actions">
+              <a href="/admin" className="geo-import-button" style={{ textDecoration: "none" }}>Buka Admin →</a>
               <input
                 ref={importInput}
                 className="geo-file-input"
@@ -563,7 +562,7 @@ export default function Dashboard() {
               />
               <button className="geo-import-button" type="button" onClick={() => importInput.current?.click()}>
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 13V3m0 0L6 7m4-4 4 4M4 12v4h12v-4" /></svg>
-                Pilih file
+                Pratinjau CSV
               </button>
               {fileName && <span className="geo-file-name">{fileName}</span>}
               {uploadedRows.length > 0 && <button className="geo-clear-button" type="button" onClick={clearImport}>Bersihkan</button>}
