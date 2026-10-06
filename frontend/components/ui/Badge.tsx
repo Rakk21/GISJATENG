@@ -1,10 +1,23 @@
-export function Badge({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "green" | "amber" | "violet" | "blue" }) {
+export function Badge({
+  children,
+  tone = "slate",
+}: {
+  children: React.ReactNode;
+  tone?: "slate" | "green" | "amber" | "violet" | "blue";
+}) {
   const map: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-700 border-slate-200",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    violet: "bg-violet-50 text-violet-700 border-violet-200",
-    blue: "bg-sky-50 text-sky-700 border-sky-200",
+    slate: "bg-[#f4f4f3] text-[#555552] border-[#e4e4e3]",
+    green: "bg-[#eaf1ed] text-[#1d4033] border-[#c2dad0]",
+    amber: "bg-[#fef9ee] text-[#8a5d14] border-[#f6e4be]",
+    violet: "bg-[#f6f5f9] text-[#4d4469] border-[#dfdbe8]",
+    blue: "bg-[#f0f4f8] text-[#24527a] border-[#cde0f0]",
   };
-  return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${map[tone]}`}>{children}</span>;
+  return (
+    <span
+      className={`inline-flex items-center rounded-[4px] border px-2 py-0.5 text-[11px] font-medium tracking-tight ${map[tone] || map.slate}`}
+    >
+      {children}
+    </span>
+  );
 }
+

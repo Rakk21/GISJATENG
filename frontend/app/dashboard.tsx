@@ -3,6 +3,53 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 
+// ── Basemap API keys (NEXT_PUBLIC_* agar terbaca di browser) ──
+// Isi di frontend/.env.local lalu restart `next dev`. Jika kosong, fallback ke OpenStreetMap + Esri (100% gratis tanpa key/watermark).
+const MAPTILER_KEY = (process.env.NEXT_PUBLIC_MAPTILER_KEY ?? "").trim();
+const MAPBOX_TOKEN = (process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "").trim();
+
+function basemapConfig() {
+  if (MAPTILER_KEY) {
+    return {
+      provider: "MapTiler" as const,
+      light: {
+        url: `https://api.maptiler.com/maps/dataviz-light/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`,
+        attribution: '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; OpenStreetMap',
+      },
+      satellite: {
+        url: `https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`,
+        attribution: '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; OpenStreetMap & Esri',
+      },
+    };
+  }
+  if (MAPBOX_TOKEN) {
+    return {
+      provider: "Mapbox" as const,
+      light: {
+        url: `https://api.mapbox.com/styles/v1/mapbox/light-v11/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`,
+        attribution: '&copy; <a href="https://www.mapbox.com/">Mapbox</a> &copy; OpenStreetMap',
+      },
+      satellite: {
+        url: `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`,
+        attribution: '&copy; <a href="https://www.mapbox.com/">Mapbox</a> &copy; OpenStreetMap & Maxar',
+      },
+    };
+  }
+  return {
+    provider: "Fallback" as const,
+    light: {
+      // Fallback 100% gratis tanpa key — OSM HOT (Humanitarian) dari OSM France
+      url: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles style: HOT — <a href="https://www.openstreetmap.fr/">OSM France</a>',
+      subdomains: "abc" as const,
+    },
+    satellite: {
+      url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      attribution: "Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics",
+    },
+  };
+}
+
 type Region = {
   id: number;
   kode_kemendagri: string;
@@ -204,6 +251,32 @@ function RegionMap({
   const selectedRef = useRef(selectedRegion);
   const onSelectRef = useRef(onSelect);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [basemap, setBasemap] = useState<"light" | "satellite">("light");
+  const tileLightRef = useRef<import("leaflet").TileLayer | null>(null);
+  const tileSatRef = useRef<import("leaflet").TileLayer | null>(null);
+  const maskRef = useRef<import("leaflet").GeoJSON | null>(null);
+
+  const styleFor = useCallback(
+    (name: string, isSelected: boolean, mode: "light" | "satellite") => {
+      if (mode === "satellite") {
+        return {
+          color: isSelected ? "#ffffff" : "rgba(255,255,255,0.9)",
+          weight: isSelected ? 2.2 : 1,
+          opacity: 1,
+          fillColor: isSelected ? "#2e5d4f" : "#ffffff",
+          fillOpacity: isSelected ? 0.55 : 0.18,
+        } as import("leaflet").PathOptions;
+      }
+      return {
+        color: isSelected ? "#1a3d33" : "#7aa89a",
+        weight: isSelected ? 2.4 : 1.05,
+        opacity: 1,
+        fillColor: isSelected ? "#1d4033" : "#ffffff",
+        fillOpacity: isSelected ? 0.92 : 0.58,
+      } as import("leaflet").PathOptions;
+    },
+    [],
+  );
 
   useEffect(() => {
     selectedRef.current = selectedRegion;
@@ -222,17 +295,40 @@ function RegionMap({
         const L = await import("leaflet");
         if (!mapElement.current || cancelled) return;
 
+        // Jawa Tengah fokus — batasi pan/zoom agar tidak ke luar provinsi
         map = L.map(mapElement.current, {
-          center: [-7.25, 110.1],
-          zoom: 7,
-          minZoom: 6,
-          maxZoom: 11,
-          scrollWheelZoom: false,
-          maxBoundsViscosity: 0.85,
+          center: [-7.18, 110.0],
+          zoom: 8,
+          minZoom: 7,
+          maxZoom: 13,
+          scrollWheelZoom: true,
+          maxBoundsViscosity: 1.0,
           zoomControl: false,
+          attributionControl: false,
         });
         mapRef.current = map;
+
+        const cfg = basemapConfig();
+        const lightOpts: Record<string, unknown> = {
+          attribution: cfg.light.attribution,
+          maxZoom: 19,
+          tileSize: 256,
+        };
+        if ((cfg.light as { subdomains?: string }).subdomains) {
+          (lightOpts as Record<string, unknown>).subdomains = (cfg.light as { subdomains?: string }).subdomains;
+        }
+        const light = L.tileLayer(cfg.light.url, lightOpts as L.TileLayerOptions);
+        const satellite = L.tileLayer(cfg.satellite.url, {
+          attribution: cfg.satellite.attribution,
+          maxZoom: 19,
+          tileSize: 256,
+        } as L.TileLayerOptions);
+        tileLightRef.current = light;
+        tileSatRef.current = satellite;
+        (basemap === "satellite" ? satellite : light).addTo(map);
+
         L.control.zoom({ position: "bottomright" }).addTo(map);
+        L.control.attribution({ position: "bottomright", prefix: false }).addTo(map);
 
         const response = await fetch("/kabupaten-jawa-tengah.geojson");
         if (!response.ok) throw new Error("Batas kabupaten/kota Jawa Tengah tidak dapat dimuat.");
@@ -244,48 +340,94 @@ function RegionMap({
 
         const layer = L.geoJSON(geojson as import("geojson").GeoJsonObject, {
           style: (feature) => {
+            const name = String(feature?.properties?.KABUPATEN ?? "");
             const isSelected =
-              normalizeName(String(feature?.properties?.KABUPATEN ?? "")) ===
-              normalizeName(selectedRef.current ?? "");
-            return {
-              color: isSelected ? "#2e5d4f" : "#8aa89a",
-              weight: isSelected ? 2 : 1,
-              opacity: 1,
-              fillColor: isSelected ? "#a9c6b6" : "#dde8e1",
-              fillOpacity: isSelected ? 0.72 : 0.42,
-            };
+              normalizeName(name) === normalizeName(selectedRef.current ?? "");
+            return styleFor(name, isSelected, basemap);
           },
           onEachFeature(feature, polygon) {
             const name = String(feature.properties?.KABUPATEN ?? "");
             if (!name) return;
             const path = polygon as import("leaflet").Path;
-            polygon.bindTooltip(name, {
-              sticky: true,
-              direction: "center",
-              className: "geo-map-tooltip",
-            });
+            polygon.bindTooltip(
+              `<span style="font-weight:700;font-size:12px;color:#111312">${name}</span><br/><span style="font-size:11px;color:#6b7d78">Jawa Tengah · klik untuk detail</span>`,
+              {
+                sticky: true,
+                direction: "center",
+                className: "geo-map-tooltip",
+                opacity: 0.96,
+              },
+            );
             polygon.on({
               click: () => onSelectRef.current(name),
-              mouseover: () => path.setStyle({ color: "#2e5d4f", weight: 1.8, fillOpacity: 0.6 }),
+              mouseover: () => {
+                const isSelected =
+                  normalizeName(name) === normalizeName(selectedRef.current ?? "");
+                if (!isSelected) path.setStyle({ weight: 1.9, fillOpacity: basemap === "satellite" ? 0.42 : 0.78 } as any);
+              },
               mouseout: () => {
                 const isSelected =
                   normalizeName(name) === normalizeName(selectedRef.current ?? "");
-                path.setStyle({
-                  color: isSelected ? "#2e5d4f" : "#8aa89a",
-                  weight: isSelected ? 2 : 1,
-                  fillColor: isSelected ? "#a9c6b6" : "#dde8e1",
-                  fillOpacity: isSelected ? 0.72 : 0.42,
-                });
+                path.setStyle(styleFor(name, isSelected, tileSatRef.current && map?.hasLayer(tileSatRef.current) ? "satellite" : "light"));
               },
             });
           },
         }).addTo(map);
 
+        // Mask luar Jawa Tengah — hanya Jawa Tengah yang terang, luar dimask penuh (seperti BIG / Ina-Geoportal)
+        const outerRing: [number, number][] = [
+          [-180, 90],
+          [180, 90],
+          [180, -90],
+          [-180, -90],
+          [-180, 90],
+        ];
+        const holes: [number, number][][] = [];
+        for (const f of geojson.features as unknown as { geometry?: { type: string; coordinates: unknown } }[]) {
+          const g = f.geometry as unknown as { type: string; coordinates: unknown[] };
+          if (!g?.coordinates) continue;
+          if (g.type === "Polygon") {
+            for (const ring of g.coordinates as unknown[][]) holes.push(ring as [number, number][]);
+          } else if (g.type === "MultiPolygon") {
+            for (const poly of g.coordinates as unknown[][][]) for (const ring of poly) holes.push(ring as [number, number][]);
+          }
+        }
+        const maskFeature = {
+          type: "Feature" as const,
+          properties: {},
+          geometry: { type: "Polygon" as const, coordinates: [outerRing, ...holes] },
+        };
+        const mask = L.geoJSON(maskFeature as unknown as import("geojson").GeoJsonObject, {
+          style: {
+            fillColor: basemap === "satellite" ? "#0e1a16" : "#f8f5ef",
+            fillOpacity: basemap === "satellite" ? 0.62 : 1,
+            color: "transparent",
+            weight: 0,
+            interactive: false,
+          } as unknown as import("leaflet").PathOptions,
+          interactive: false,
+        }).addTo(map);
+        // pastikan mask di atas tile tapi di bawah batas kabupaten
+        (mask as unknown as { bringToBack: () => void }).bringToBack?.();
+        layer.bringToFront();
+        maskRef.current = mask;
+
         boundariesRef.current = layer;
         const bounds = layer.getBounds();
-        map.fitBounds(bounds, { padding: [34, 34], maxZoom: 8 });
-        map.setMaxBounds(bounds.pad(0.16));
+        // kunci view hanya di Jawa Tengah — padding kecil + maxBounds ketat
+        map.fitBounds(bounds, { padding: [18, 18], maxZoom: 8 });
+        map.setMaxBounds(bounds.pad(0.08));
+        // cegah drag keluar meski di-zoom jauh
+        map.options.maxBoundsViscosity = 1.0;
         L.control.scale({ imperial: false, position: "bottomleft" }).addTo(map);
+        // fix initial render setelah font & tile load
+        setTimeout(() => map?.invalidateSize(), 140);
+        map.on("moveend", () => {
+          // jaga agar tetap di dalam Jawa Tengah (fallback jika setMaxBounds lolos)
+          if (!map) return;
+          const b = layer.getBounds().pad(0.08);
+          if (!b.contains(map.getCenter())) map.panInsideBounds(b, { animate: true });
+        });
       } catch (error) {
         if (!cancelled) {
           setMapError(error instanceof Error ? error.message : "Peta gagal dimuat.");
@@ -299,46 +441,105 @@ function RegionMap({
       mapRef.current?.remove();
       mapRef.current = null;
       boundariesRef.current = null;
+      tileLightRef.current = null;
+      tileSatRef.current = null;
+      maskRef.current = null;
     };
-  }, []);
+  }, [styleFor]);
+
+  // basemap switcher — termasuk warna mask luar Jawa Tengah
+  useEffect(() => {
+    const map = mapRef.current;
+    const light = tileLightRef.current;
+    const sat = tileSatRef.current;
+    if (!map || !light || !sat) return;
+    if (basemap === "satellite") {
+      if (map.hasLayer(light)) map.removeLayer(light);
+      if (!map.hasLayer(sat)) sat.addTo(map);
+    } else {
+      if (map.hasLayer(sat)) map.removeLayer(sat);
+      if (!map.hasLayer(light)) light.addTo(map);
+    }
+    maskRef.current?.setStyle({
+      fillColor: basemap === "satellite" ? "#0e1a16" : "#f8f5ef",
+      fillOpacity: basemap === "satellite" ? 0.62 : 1,
+    } as unknown as import("leaflet").PathOptions);
+    // restyle for contrast
+    const selected = normalizeName(selectedRef.current ?? "");
+    boundariesRef.current?.setStyle((feature) => {
+      const name = String(feature?.properties?.KABUPATEN ?? "");
+      const isSelected = normalizeName(name) === selected;
+      return styleFor(name, isSelected, basemap);
+    });
+    boundariesRef.current?.bringToFront();
+  }, [basemap, styleFor]);
 
   useEffect(() => {
     const selected = normalizeName(selectedRegion ?? "");
+    const mode: "light" | "satellite" =
+      mapRef.current && tileSatRef.current && mapRef.current.hasLayer(tileSatRef.current) ? "satellite" : "light";
     boundariesRef.current?.setStyle((feature) => {
-      const isSelected =
-        normalizeName(String(feature?.properties?.KABUPATEN ?? "")) === selected;
-      return {
-        color: isSelected ? "#2e5d4f" : "#8aa89a",
-        weight: isSelected ? 2 : 1,
-        fillColor: isSelected ? "#a9c6b6" : "#dde8e1",
-        fillOpacity: isSelected ? 0.72 : 0.42,
-      };
+      const name = String(feature?.properties?.KABUPATEN ?? "");
+      const isSelected = normalizeName(name) === selected;
+      return styleFor(name, isSelected, mode);
     });
-  }, [selectedRegion]);
+  }, [selectedRegion, styleFor]);
 
   const focusProvince = useCallback(() => {
     const map = mapRef.current;
     const bounds = boundariesRef.current?.getBounds();
     if (!map || !bounds) return;
     map.invalidateSize();
-    map.fitBounds(bounds, { padding: [34, 34], maxZoom: 8, animate: true });
+    map.fitBounds(bounds, { padding: [28, 28], maxZoom: 8, animate: true });
   }, []);
 
   return (
-    <div className="geo-map-frame">
+    <div className={`geo-map-frame ${basemap === "satellite" ? "is-satellite" : ""}`}>
       <div className="geo-map-stamp">
         <span className="geo-live-dot" />
         <span>Jawa Tengah</span>
         <i />
         <span>35 kabupaten / kota</span>
       </div>
+      <div className="geo-map-basemap" role="tablist" aria-label="Pilih basemap">
+        <button
+          role="tab"
+          aria-selected={basemap === "light"}
+          className={basemap === "light" ? "is-active" : ""}
+          type="button"
+          onClick={() => setBasemap("light")}
+        >
+          Terang
+        </button>
+        <button
+          role="tab"
+          aria-selected={basemap === "satellite"}
+          className={basemap === "satellite" ? "is-active" : ""}
+          type="button"
+          onClick={() => setBasemap("satellite")}
+        >
+          Satelit
+        </button>
+      </div>
       <button className="geo-map-focus" type="button" onClick={focusProvince}>
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5M3 3l5 5m9-5-5 5m5 9-5-5m-9 5 5-5" /></svg>
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5M3 3l5 5m9-5-5 5m5 9-5-5m-9 5 5-5" />
+        </svg>
         Lihat seluruh provinsi
       </button>
       <div ref={mapElement} className="geo-map-canvas" aria-label="Peta batas kabupaten dan kota Jawa Tengah" />
-      {mapError && <p className="geo-map-error" role="alert">{mapError}</p>}
-      <div className="geo-map-legend"><span /><span>Batas wilayah</span><b /><span>Dipilih</span></div>
+      {mapError && (
+        <p className="geo-map-error" role="alert">
+          {mapError}
+        </p>
+      )}
+      <div className="geo-map-legend">
+        <span />
+        <span>Batas wilayah</span>
+        <b />
+        <span>Dipilih</span>
+        <i className="geo-map-legend-hint">· klik wilayah untuk detail</i>
+      </div>
     </div>
   );
 }
@@ -625,7 +826,15 @@ export default function Dashboard() {
               setQueryMessage("Wilayah dipilih dari geometri peta; data statistiknya belum terhubung ke master API.");
             }
           }} />
-          <p className="geo-map-footnote">Hanya batas administratif Jawa Tengah. Tidak ada basemap atau tutupan lahan tambahan — sengaja dibuat sederhana agar fokus.</p>
+          <p className="geo-map-footnote">
+            Basemap{" "}
+            {(() => {
+              const p = basemapConfig().provider;
+              return p === "MapTiler" ? "MapTiler Dataviz Light & Hybrid (API key aktif)" : p === "Mapbox" ? "Mapbox Light & Satellite Streets (token aktif)" : "OpenStreetMap HOT & Esri World Imagery (gratis)";
+            })()}{" "}
+            — batas kabupaten/kota dari GeoJSON. Ganti Terang / Satelit di atas peta. Untuk peta lebih jernih, isi{" "}
+            <code>NEXT_PUBLIC_MAPTILER_KEY</code> di <code>frontend/.env.local</code>.
+          </p>
         </section>
 
         <section className="geo-selected-panel" aria-live="polite">
