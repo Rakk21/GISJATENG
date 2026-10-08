@@ -1,36 +1,30 @@
 import type { Metadata } from "next";
-import { DM_Sans, Newsreader, IBM_Plex_Mono } from "next/font/google";
+import { Manrope, DM_Mono } from "next/font/google";
 import "./globals.css";
 
-const dmSans = DM_Sans({
-  variable: "--font-geist-sans",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
-const newsreader = Newsreader({
-  variable: "--font-serif",
-  subsets: ["latin"],
-  style: ["normal", "italic"],
-});
-
-const plexMono = IBM_Plex_Mono({
-  variable: "--font-geist-mono",
+const dmMono = DM_Mono({
+  variable: "--font-dm-mono",
   subsets: ["latin"],
   weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
-  title: "Ruang Wilayah — Jawa Tengah",
+  title: "Sistem Informasi Geografis Jawa Tengah",
   description:
-    "Peta dan data Jawa Tengah yang tenang: batas kabupaten/kota, peringkat wilayah, dan direktori administratif.",
+    "Eksplorasi data wilayah, persebaran anggota, dan struktur administrasi Jawa Tengah — mirip Atlas Pengurus.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="id"
-      className={`${dmSans.variable} ${newsreader.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${manrope.variable} ${dmMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { TableWrap, Th, Td } from "@/components/ui/Table";
@@ -18,7 +18,7 @@ export default function AdminAnggotaPage() {
   const [err, setErr] = useState<string | null>(null);
   const [q, setQ] = useState("");
 
-  function load() {
+  const loadRefetch = useCallback(() => {
     setLoading(true);
     const hasToken = typeof window !== "undefined" && !!localStorage.getItem("webgis_token");
     const url = hasToken ? `${apiBase()}/api/anggota-partai/admin` : `${apiBase()}/api/anggota-partai/`;
@@ -32,11 +32,11 @@ export default function AdminAnggotaPage() {
       .then(setRows)
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false));
-  }
+  }, []);
 
   useEffect(() => {
-    load();
-  }, []);
+    loadRefetch();
+  }, [loadRefetch]);
 
   const filtered = rows.filter((r) => {
     if (!q) return true;
@@ -46,7 +46,7 @@ export default function AdminAnggotaPage() {
 
   return (
     <div>
-      <PageHeader title="Data Anggota" description="Pendukung · Penggerak · Pelopor per wilayah. Admin otomatis hanya melihat wilayah dalam dapilnya." badge={`${filtered.length} baris`} actions={<Button variant="ghost" onClick={load}>Muat ulang</Button>} />
+      <PageHeader title="Data Anggota" description="Pendukung · Penggerak · Pelopor per wilayah. Admin otomatis hanya melihat wilayah dalam dapilnya." badge={`${filtered.length} baris`} actions={<Button variant="ghost" onClick={loadRefetch}>Muat ulang</Button>} />
       {err && <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{err}</div>}
       <Card className="mb-3">
         <CardBody>

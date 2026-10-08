@@ -12,6 +12,10 @@ class Pengguna(Base):
     hash_sandi: Mapped[str] = mapped_column(Text, nullable=False)
     peran: Mapped[str] = mapped_column(String(50), nullable=False, default="user")
     nama: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    # scope register — mirip AuthController::register (dapil_type + dapil_number / kabupaten_kota)
+    dapil_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    dapil_number: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    kabupaten_kota: Mapped[str | None] = mapped_column(String(150), nullable=True)
 
     @property
     def normalized_role(self) -> str:

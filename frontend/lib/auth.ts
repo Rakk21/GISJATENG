@@ -7,6 +7,9 @@ export type Me = {
   peran: string;
   role: string;
   dapil_ids: number[];
+  dapil_type?: string | null;
+  dapil_number?: number | null;
+  kabupaten_kota?: string | null;
 };
 
 const KEY = "webgis_token";

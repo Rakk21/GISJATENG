@@ -8,6 +8,9 @@ class PenggunaMeResponse(BaseModel):
     peran: str
     role: str  # normalized super_admin/admin
     dapil_ids: list[int]
+    dapil_type: str | None = None
+    dapil_number: int | None = None
+    kabupaten_kota: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

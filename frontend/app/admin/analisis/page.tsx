@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { Badge } from "@/components/ui/Badge";
@@ -26,7 +26,7 @@ export default function AdminAnalisisPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  function load() {
+  const loadRefetch = useCallback(() => {
     setLoading(true);
     setErr(null);
     fetch(`${apiBase()}/api/analisis/ringkasan`, { headers: authHeaders(), cache: "no-store" })
@@ -38,11 +38,11 @@ export default function AdminAnalisisPage() {
       .then(setData)
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false));
-  }
+  }, []);
 
   useEffect(() => {
-    load();
-  }, []);
+    loadRefetch();
+  }, [loadRefetch]);
 
   return (
     <div>
@@ -50,7 +50,7 @@ export default function AdminAnalisisPage() {
         title="Analisis GIS"
         description="Ringkasan spasial & statistik terfilter otomatis per dapil. Super Admin melihat semua; Admin hanya dapilnya."
         badge={data?.is_scoped ? "Terfilter per dapil" : "Semua dapil"}
-        actions={<Button variant="ghost" onClick={load}>Muat ulang</Button>}
+        actions={<Button variant="ghost" onClick={loadRefetch}>Muat ulang</Button>}
       />
       {err && <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{err}</div>}
       {loading ? (
