@@ -209,14 +209,37 @@ export default function Dashboard() {
     return () => { cancelled = true; };
   }, [detailRegion?.name]);
 
-  // ganti kab/kota: reset seleksi kecamatan saja, JANGAN paksa balik ke level "kab"
-  // (yang bikin stuck: effect sebelumnya setLevel("kab") setiap detailRegion berubah, sehingga
-  // klik yang barusan setLevel("kec") langsung dibalikin ke "kab" sebelum kecGeo ke-render)
+  // ganti kab/kota: sinkronkan kecamatan. Saat kembali ke dapil (detailRegion null) -> selalu reset ke overview dapil.
   useEffect(() => {
+    const kab = detailRegion?.name ?? null;
+    if (!kab) {
+      // kembali ke Dapil RI 1 (lihat semua wilayah dapil) — sesuai klik Dapil RI di screenshot
+      setLevel("kab");
+      setKecSelected(null);
+      setKecRincian(null);
+      setKecRincianError(null);
+      setKecGeo(null);
+      setKecLoading(false);
+      return;
+    }
+    if (level === "kec") {
+      let cancelled = false;
+      setKecSelected(null);
+      setKecRincian(null);
+      setKecRincianError(null);
+      setKecLoading(true);
+      const base = apiBase();
+      fetch(`${base}/api/geo/kecamatan?kab_kota=${encodeURIComponent(kab)}`, { cache: "no-store" })
+        .then(async (res) => { if (!res.ok) throw new Error(`Gagal memuat kecamatan (${res.status})`); const gj = await res.json(); if (!cancelled) setKecGeo(gj); })
+        .catch((e: unknown) => { if (!cancelled) setKecRincianError(e instanceof Error ? e.message : String(e)); })
+        .finally(() => { if (!cancelled) setKecLoading(false); });
+      return () => { cancelled = true; };
+    }
     setKecSelected(null);
     setKecRincian(null);
     setKecRincianError(null);
-  }, [detailRegion?.name]);
+    setKecLoading(false);
+  }, [detailRegion?.name, level]);
 
   // fetch rincian kecamatan terpilih (dari layer kecamatan)
   useEffect(() => {
@@ -885,7 +908,33 @@ export default function Dashboard() {
               <span className="stat-trend">{isScoped ? `khusus ${selectedDapilLabel}` : <><span>+8.4% <small>sejak pembaruan terakhir</small></span></>}</span>
               <div className="sparkline"><i /><i /><i /><i /><i /><i /><i /><i /><i /></div>
             </article>
-            <article className={`stat-card ${isKabKotaScoped ? "stat-empty" : ""}`}><span className="stat-label">DAPIL RI</span><strong>{statDapilRi}</strong><span className="stat-caption">{statDapilRiCaption}</span><span className="stat-index">01</span></article>
+            <article
+              role={isScoped ? "button" : undefined}
+              tabIndex={isScoped ? 0 : undefined}
+              onClick={isScoped ? () => {
+                // kembali ke overview dapil (contoh Dapil RI 1 = 4 wilayah) — jangan stuck di 1 kab/kecamatan
+                setLevel("kab");
+                setKecGeo(null);
+                setKecSelected(null);
+                setKecRincian(null);
+                setKecRincianError(null);
+                setKecLoading(false);
+                setSelectedName(null);
+                setRegionQuery("");
+                setMemberQuery("");
+                setRegionBoxOpen(false);
+                setMemberBoxOpen(false);
+                // paksa peta fit ke dapil, bukan ke 1 kab
+                setTimeout(() => {
+                  const l: any = geoRef.current;
+                  if (l && mapRef.current) mapRef.current.fitBounds(l.getBounds(), { padding: [18, 18], maxZoom: 9 });
+                }, 120);
+              } : undefined}
+              onKeyDown={isScoped ? (e) => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setLevel("kab"); setKecGeo(null); setKecSelected(null); setKecRincian(null); setKecRincianError(null); setKecLoading(false); setSelectedName(null); setRegionQuery(""); setMemberQuery(""); } } : undefined}
+              title={isScoped ? `Kembali ke ${selectedDapilLabel} — klik untuk lihat semua wilayah Dapil` : undefined}
+              className={`stat-card ${isKabKotaScoped ? "stat-empty" : ""}`}
+              style={isScoped ? { cursor: "pointer" } : undefined}
+            ><span className="stat-label">DAPIL RI</span><strong>{statDapilRi}</strong><span className="stat-caption">{isScoped ? `${statDapilRiCaption} · klik untuk ${selectedDapilLabel ?? "Dapil"}` : statDapilRiCaption}</span><span className="stat-index">01</span></article>
             <article className={`stat-card ${isKabKotaScoped ? "stat-empty" : ""}`}><span className="stat-label">DAPIL PROVINSI</span><strong>{statDapilProv}</strong><span className="stat-caption">{statDapilProvCaption}</span><span className="stat-index">02</span></article>
             <article className="stat-card"><span className="stat-label">KABUPATEN / KOTA</span><strong>{totals.districts}</strong><span className="stat-caption">{isKabKotaScoped ? "1 wilayah terkunci" : "wilayah administratif"}</span><span className="stat-index">03</span></article>
             <article className={`stat-card stat-dapil-count ${!isKabKotaScoped ? "stat-empty" : ""}`}><span className="stat-label">JUMLAH DAPIL</span><strong>{statJumlahDapil}</strong><span className="stat-caption">{statJumlahDapilCaption}</span><span className="stat-index">04</span></article>
@@ -894,7 +943,7 @@ export default function Dashboard() {
 
           <section className="map-section" id="map-section">
             <div className="section-heading">
-              <div><p className="eyebrow">01 / PETA WILAYAH</p><h2>Jawa Tengah <span id="map-heading-suffix">{detailRegion ? `di ${detailRegion.name}.` : isScoped ? `di ${selectedDapilLabel}.` : "secara keseluruhan."}</span></h2></div>
+              <div><p className="eyebrow">01 / PETA WILAYAH</p><h2>Jawa Tengah <span id="map-heading-suffix">{level === "kec" && detailRegion ? `di Kec. ${kecSelected ?? "—"} — ${detailRegion.name}.` : detailRegion ? `di ${detailRegion.name}.` : isScoped ? `di ${selectedDapilLabel}.` : "secara keseluruhan."}</span></h2></div>
               <div className="map-legend map-legend-grad" aria-label="Legenda gradiasi anggota">
                 <div className="map-legend-bar" title="Gradiasi: terang=rendah, gelap=tinggi" aria-hidden />
                 {level === "kec" ? (
@@ -1107,7 +1156,7 @@ export default function Dashboard() {
                 <p className="detail-description">{kecLoading ? "Memuat batas kecamatan..." : "Memuat..."}</p>
               ) : !kecSelected ? (
                 <div>
-                  <p className="detail-description">Klik salah satu kecamatan di peta (gradiasi gelap=padat). Data agregat kecamatan mengikuti wilayah dapil/kab-kota yang sedang aktif. Batas kecamatan diambil dari <code style={{ fontSize: 11 }}>kecamatan.geojson</code> (KODE_KEC · KODE_KK · KAB_KOTA).</p>
+                  <p className="detail-description">Klik salah satu kecamatan di peta yang sesuai pada peta.<code style={{ fontSize: 11 }}></code></p>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px,1fr))", gap: 8, marginTop: 10 }}>
                     {kecGeo.features.slice(0, 32).map((f: any) => {
                       const nm = String(f.properties?.KECAMATAN ?? "");
