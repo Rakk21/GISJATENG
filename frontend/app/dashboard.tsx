@@ -92,16 +92,27 @@ export default function Dashboard() {
   const [rincian, setRincian] = useState<WilayahRincian | null>(null);
   const [rincianLoading, setRincianLoading] = useState(false);
   const [rincianError, setRincianError] = useState<string | null>(null);
-  const [level, setLevel] = useState<"kab" | "kec">("kab");
+  const [level, setLevel] = useState<"kab" | "kec" | "desa">("kab");
   const [kecGeo, setKecGeo] = useState<any | null>(null);
   const [kecLoading, setKecLoading] = useState(false);
   const [kecSelected, setKecSelected] = useState<string | null>(null);
+  const [kecKode, setKecKode] = useState<string | null>(null);
   const [kecRincian, setKecRincian] = useState<WilayahRincian | null>(null);
   const [kecRincianLoading, setKecRincianLoading] = useState(false);
   const [kecRincianError, setKecRincianError] = useState<string | null>(null);
+  // level desa — pecah kecamatan → desa (desa.geojson: KEL_DESA, KODE_KD, KODE_KEC)
+  const [desaGeo, setDesaGeo] = useState<any | null>(null);
+  const [desaLoading, setDesaLoading] = useState(false);
+  const [desaSelected, setDesaSelected] = useState<string | null>(null);
+  const [desaKode, setDesaKode] = useState<string | null>(null);
+  const [desaRincian, setDesaRincian] = useState<WilayahRincian | null>(null);
+  const [desaRincianLoading, setDesaRincianLoading] = useState(false);
+  const [desaRincianError, setDesaRincianError] = useState<string | null>(null);
 
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const geoRef = useRef<import("leaflet").GeoJSON | null>(null);
+  const maskRef = useRef<import("leaflet").GeoJSON | null>(null);
+  const initSeqRef = useRef(0);
 
   /* ── guard: wajib login dulu seperti pengurus Route::middleware('auth') ── */
   useEffect(() => {
@@ -210,23 +221,59 @@ export default function Dashboard() {
   }, [detailRegion?.name]);
 
   // ganti kab/kota: sinkronkan kecamatan. Saat kembali ke dapil (detailRegion null) -> selalu reset ke overview dapil.
+  // PENTING: level "desa" dipertahankan — jangan clear kecSelected/desa saat transisi kec→desa (rantai kab→kec→desa).
   useEffect(() => {
     const kab = detailRegion?.name ?? null;
     if (!kab) {
       // kembali ke Dapil RI 1 (lihat semua wilayah dapil) — sesuai klik Dapil RI di screenshot
       setLevel("kab");
       setKecSelected(null);
+      setKecKode(null);
       setKecRincian(null);
       setKecRincianError(null);
       setKecGeo(null);
       setKecLoading(false);
+      setDesaGeo(null);
+      setDesaSelected(null);
+      setDesaKode(null);
+      setDesaRincian(null);
+      setDesaRincianError(null);
+      setDesaLoading(false);
+      return;
+    }
+    if (level === "desa") {
+      // rantai statistik kab (05) → kec (06) → desa (07) harus utuh: jangan clear saat level baru masuk desa.
+      // Hanya reset bila user mengganti kab/kota ke wilayah lain saat sedang di level desa.
+      const curDesaKab = (desaGeo?.features?.[0] as { properties?: Record<string, unknown> } | undefined)?.properties?.KAB_KOTA;
+      const curKecKab = (kecGeo?.features?.[0] as { properties?: Record<string, unknown> } | undefined)?.properties?.KAB_KOTA;
+      const sameDesa = typeof curDesaKab === "string" && curDesaKab ? isSameKabKota(curDesaKab, kab) : true;
+      const sameKec = typeof curKecKab === "string" && curKecKab ? isSameKabKota(curKecKab, kab) : true;
+      if (sameDesa && sameKec) return;
+      // kab diganti dari pencarian/klik lain → mulai ulang dari kab baru
+      setLevel("kab");
+      setKecSelected(null);
+      setKecKode(null);
+      setKecRincian(null);
+      setKecRincianError(null);
+      setKecGeo(null);
+      setDesaGeo(null);
+      setDesaSelected(null);
+      setDesaKode(null);
+      setDesaRincian(null);
+      setDesaRincianError(null);
       return;
     }
     if (level === "kec") {
       let cancelled = false;
       setKecSelected(null);
+      setKecKode(null);
       setKecRincian(null);
       setKecRincianError(null);
+      setDesaGeo(null);
+      setDesaSelected(null);
+      setDesaKode(null);
+      setDesaRincian(null);
+      setDesaRincianError(null);
       setKecLoading(true);
       const base = apiBase();
       fetch(`${base}/api/geo/kecamatan?kab_kota=${encodeURIComponent(kab)}`, { cache: "no-store" })
@@ -235,10 +282,22 @@ export default function Dashboard() {
         .finally(() => { if (!cancelled) setKecLoading(false); });
       return () => { cancelled = true; };
     }
-    setKecSelected(null);
-    setKecRincian(null);
-    setKecRincianError(null);
-    setKecLoading(false);
+    // level desa dipertahankan (kecGeo tetap, desaGeo difetch via handleMasukDesa); level kab → reset semua.
+    // PENTING: jangan clear kecSelected — panel 06 (statistik kecamatan) harus tetap tampil saat level desa.
+    if (level === "kab") {
+      setKecGeo(null);
+      setKecSelected(null);
+      setKecKode(null);
+      setKecRincian(null);
+      setKecRincianError(null);
+      setKecLoading(false);
+      setDesaGeo(null);
+      setDesaSelected(null);
+      setDesaKode(null);
+      setDesaRincian(null);
+      setDesaRincianError(null);
+      setDesaLoading(false);
+    }
   }, [detailRegion?.name, level]);
 
   // fetch rincian kecamatan terpilih (dari layer kecamatan)
@@ -262,6 +321,27 @@ export default function Dashboard() {
       .finally(() => { if (!cancelled) setKecRincianLoading(false); });
     return () => { cancelled = true; };
   }, [kecSelected, detailRegion?.name]);
+
+  // fetch rincian desa terpilih (dari layer desa)
+  useEffect(() => {
+    const desa = desaSelected;
+    if (!desa) { setDesaRincian(null); setDesaRincianError(null); return; }
+    let cancelled = false;
+    setDesaRincianLoading(true);
+    setDesaRincianError(null);
+    const base = apiBase();
+    fetch(`${base}/api/wilayah-rincian?nama=${encodeURIComponent(desa)}&tingkat=desa`, { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Rincian desa tidak tersedia (${res.status})`);
+        const j = (await res.json()) as WilayahRincian;
+        if (!cancelled) setDesaRincian(j);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setDesaRincianError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => { if (!cancelled) setDesaRincianLoading(false); });
+    return () => { cancelled = true; };
+  }, [desaSelected]);
 
   const chartData = useMemo(() => {
     const sorted = [...regions].sort((a, b) => b.members - a.members);
@@ -300,34 +380,59 @@ export default function Dashboard() {
     setMemberBoxOpen(hits.length > 0);
   }, [memberQuery, visibleMembers]);
 
-  /* ── peta: kab/kota + drill-down kecamatan — basemap OSM, mask, gradasi, batas kecamatan ── */
+  /* ── peta: kab/kota + drill-down kecamatan → desa.
+     Map + basemap dibuat SEKALI (saat auth siap). Tiap ganti layer (kab/kec/desa)
+     hanya GeoJSON layer yang diganti via replace — tanpa remove/create map, jadi
+     tidak ada race "Cannot read properties of undefined (reading 'appendChild')".
+     Seleksi (klik) cukup re-style, tidak me-replace layer. ── */
   useEffect(() => {
     if (!authChecked) return;
     let cancelled = false;
+    const mySeq = ++initSeqRef.current;
+    const isStale = () => cancelled || mySeq !== initSeqRef.current;
     async function init() {
       const L = await import("leaflet");
-      if (cancelled) return;
+      if (isStale()) return;
       const el = document.getElementById("map");
-      if (!el) return;
-      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; geoRef.current = null; }
-      const map = L.map(el as HTMLElement, {
-        zoomControl: false,
-        attributionControl: false,
-        center: [-7.25, 110.1],
-        zoom: 8,
-        minZoom: 7,
-        maxZoom: 14,
-        maxBoundsViscosity: 1.0,
-      });
-      mapRef.current = map;
-      L.control.zoom({ position: "topleft" }).addTo(map);
-      L.control.attribution({ position: "bottomright", prefix: '<span style="display:inline-flex;align-items:center;gap:3px"><span style="width:12px;height:8px;background:#0478e3;display:inline-block;border-radius:1px"></span> Leaflet</span>' }).addTo(map);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: '© OSM · Dapil 1',
-      }).addTo(map);
+      if (!el || isStale()) return;
+      // kalau map sudah ada (StrictMode / re-run), pakai ulang — jangan create baru
+      let map = mapRef.current;
+      if (!map || !(map as unknown as { _container?: unknown })._container) {
+        if (mapRef.current) { try { mapRef.current.remove(); } catch { /* abaikan */ } mapRef.current = null; geoRef.current = null; maskRef.current = null; }
+        try { delete (el as unknown as Record<string, unknown>)._leaflet_id; } catch { /* abaikan */ }
+        if (isStale()) return;
+        map = L.map(el as HTMLElement, {
+          zoomControl: false,
+          attributionControl: false,
+          center: [-7.25, 110.1],
+          zoom: 8,
+          minZoom: 7,
+          maxZoom: 14,
+          maxBoundsViscosity: 1.0,
+        });
+        mapRef.current = map;
+        L.control.zoom({ position: "topleft" }).addTo(map);
+        L.control.attribution({ position: "bottomright", prefix: '<span style="display:inline-flex;align-items:center;gap:3px"><span style="width:12px;height:8px;background:#0478e3;display:inline-block;border-radius:1px"></span> Leaflet</span>' }).addTo(map);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: '© OSM · Dapil 1',
+        }).addTo(map);
+        map.on("moveend", () => {
+          const mm = mapRef.current;
+          if (!mm) return;
+          try {
+            const ctr = mm.getCenter();
+            const mb = mm.options.maxBounds as import("leaflet").LatLngBounds | undefined;
+            if (mb && !mb.contains(ctr)) mm.panInsideBounds(mb, { animate: true });
+          } catch { /* abaikan */ }
+        });
+        setTimeout(() => { try { mapRef.current?.invalidateSize(); } catch { /* abaikan */ } }, 180);
+      }
+      const activeMap = map;
 
       try {
+        // guard: init kedua yang datang belakangan jangan menimpa map yang sudah aktif
+        if (isStale()) return;
         async function fetchFirstOk(urls: string[]): Promise<Response> {
           let lastErr: Error | null = null;
           for (const u of urls) {
@@ -340,10 +445,21 @@ export default function Dashboard() {
           throw lastErr ?? new Error("GeoJSON tidak ditemukan");
         }
         const KOTA_URLS = [MAP_URL, "/kabupaten-jawa-tengah.geojson", "/geojson/Jateng.geojson", "/geojson/kecamatan.geojson"];
-        // level=kec -> pakai kecGeo yang sudah difilter per dapil/kab; level=kab -> kota.geojson
+        // level=desa -> pakai desaGeo (pecah kecamatan); level=kec -> kecGeo; level=kab -> kota.geojson
         let geojson: any;
         let jatengFeatures: any[];
-        if (level === "kec" && kecGeo?.features?.length) {
+        if (level === "desa" && desaGeo?.features?.length) {
+          geojson = desaGeo;
+          try {
+            const pr = await fetchFirstOk(KOTA_URLS);
+            const pj: any = await pr.json();
+            jatengFeatures = pj.features ?? [];
+          } catch { jatengFeatures = kecGeo?.features ?? desaGeo.features ?? []; }
+        } else if (level === "desa" && !desaGeo?.features?.length) {
+          const res2 = await fetchFirstOk(KOTA_URLS);
+          geojson = await res2.json();
+          jatengFeatures = [...(geojson.features ?? [])];
+        } else if (level === "kec" && kecGeo?.features?.length) {
           geojson = kecGeo;
           try {
             const pr = await fetchFirstOk(KOTA_URLS);
@@ -382,6 +498,35 @@ export default function Dashboard() {
         }
 
         const getStyle = (feature: any, isSelected: boolean) => {
+          if (level === "desa") {
+            const desaName = String(feature.properties?.KEL_DESA ?? feature.properties?.NAME ?? "").trim();
+            const kecName = String(feature.properties?.KECAMATAN ?? "");
+            const kab = String(feature.properties?.KAB_KOTA ?? "");
+            const reg = atlasRegions.find((r) => isSameKabKota(kab, r.name));
+            const base = reg ? reg.members : Math.round((membersMin + membersMax) / 2);
+            const nDesa = reg ? reg.desa : 200;
+            const nKec = reg ? reg.kecamatan : 10;
+            const perDesa = Math.max(1, nDesa / nKec);
+            let h = 0;
+            for (let i = 0; i < desaName.length; i++) h = (h * 31 + desaName.charCodeAt(i)) % 100;
+            const v = Math.max(1, Math.round(base / nDesa + (h % 5) - 2));
+            void kecName; void perDesa;
+            let kMin = membersMin, kMax = membersMax;
+            if (desaGeo?.features?.length) {
+              const vals: number[] = desaGeo.features.map((ff: any) => {
+                const kk = String(ff.properties?.KAB_KOTA ?? "");
+                const rr = atlasRegions.find((x) => isSameKabKota(kk, x.name));
+                const bb = rr ? rr.members : 150;
+                const dd = rr ? rr.desa : 200;
+                const nm = String(ff.properties?.KEL_DESA ?? ff.properties?.NAME ?? "");
+                let hh = 0; for (let j = 0; j < nm.length; j++) hh = (hh * 31 + nm.charCodeAt(j)) % 100;
+                return Math.max(1, Math.round(bb / dd + (hh % 5) - 2));
+              });
+              kMin = Math.min(...vals); kMax = Math.max(...vals);
+            }
+            const fill = isSelected ? "#1d4033" : fillForMembers(v, kMin, kMax);
+            return { color: isSelected ? "#1d4033" : "#6b8a7d", weight: isSelected ? 2 : 0.7, opacity: 1, fillColor: fill, fillOpacity: isSelected ? 0.6 : 0.45 } as import("leaflet").PathOptions;
+          }
           if (level === "kec") {
             const kecName = String(feature.properties?.KECAMATAN ?? "").trim();
             const kab = String(feature.properties?.KAB_KOTA ?? "");
@@ -417,6 +562,12 @@ export default function Dashboard() {
 
         const layer = L.geoJSON(geojson as any, {
           style: (feature) => {
+            if (level === "desa") {
+              const dn = String(feature?.properties?.KEL_DESA ?? feature?.properties?.NAME ?? "").trim();
+              const kd = String(feature?.properties?.KODE_KD ?? "").trim();
+              const isSel = desaKode ? kd === desaKode : desaSelected ? dn.toLowerCase() === desaSelected.toLowerCase() : false;
+              return getStyle(feature, isSel);
+            }
             if (level === "kec") {
               const kn = String(feature?.properties?.KECAMATAN ?? "").trim();
               const isSel = kecSelected ? kn.toLowerCase() === kecSelected.toLowerCase() : false;
@@ -427,13 +578,44 @@ export default function Dashboard() {
             return getStyle(feature, isSel);
           },
           onEachFeature: (feature: any, lyr: any) => {
+            if (level === "desa") {
+              const desaName: string = String(feature.properties?.KEL_DESA ?? feature.properties?.NAME ?? "Desa");
+              const kecName: string = String(feature.properties?.KECAMATAN ?? "");
+              const kabName: string = String(feature.properties?.KAB_KOTA ?? "");
+              const kodeKd: string = String(feature.properties?.KODE_KD ?? "");
+              const jenis: string = String(feature.properties?.JENIS_KD ?? "");
+              lyr.bindTooltip(
+                `<div style="font-weight:700;font-size:12px;color:#1d4033">${desaName}${jenis ? ` (${jenis})` : ""}</div><div style="font-size:11px;color:#7c8983">Kec. ${kecName} · ${kabName}${kodeKd ? ` · ${kodeKd}` : ""}</div><div style="font-size:10px;color:#9db0a8">klik untuk detail desa</div>`,
+                { sticky: true, direction: "center", className: "adm-map-tooltip", opacity: 0.98 }
+              );
+              lyr.on({
+                mouseover: (e: any) => {
+                  const kd = String(feature.properties?.KODE_KD ?? "");
+                  const dn = String(feature.properties?.KEL_DESA ?? feature.properties?.NAME ?? "");
+                  const isSel = desaKode ? kd === desaKode : desaSelected ? dn.toLowerCase() === desaSelected.toLowerCase() : false;
+                  if (!isSel) e.target.setStyle({ weight: 1.4, fillOpacity: 0.56 } as any);
+                  e.target.bringToFront();
+                },
+                mouseout: (e: any) => {
+                  const kd = String(feature.properties?.KODE_KD ?? "");
+                  const dn = String(feature.properties?.KEL_DESA ?? feature.properties?.NAME ?? "");
+                  const isSel = desaKode ? kd === desaKode : desaSelected ? dn.toLowerCase() === desaSelected.toLowerCase() : false;
+                  e.target.setStyle(getStyle(feature, isSel) as any);
+                },
+                click: () => {
+                  setDesaSelected(desaName);
+                  setDesaKode(String(feature.properties?.KODE_KD ?? "") || null);
+                },
+              });
+              return;
+            }
             if (level === "kec") {
               const kecName: string = String(feature.properties?.KECAMATAN ?? "Kecamatan");
               const kabName: string = String(feature.properties?.KAB_KOTA ?? "");
               const kabPretty = kabName.replace(/^Semarang$/, "Kabupaten Semarang");
               const kodeKec: string = String(feature.properties?.KODE_KEC ?? feature.properties?.FID ?? "");
               lyr.bindTooltip(
-                `<div style="font-weight:700;font-size:12px;color:#1d4033">${kecName}</div><div style="font-size:11px;color:#7c8983">${kabPretty}${kodeKec ? ` · ${kodeKec}` : ""}</div><div style="font-size:10px;color:#9db0a8">klik untuk detail kecamatan</div>`,
+                `<div style="font-weight:700;font-size:12px;color:#1d4033">${kecName}</div><div style="font-size:11px;color:#7c8983">${kabPretty}${kodeKec ? ` · ${kodeKec}` : ""}</div><div style="font-size:10px;color:#9db0a8">klik untuk detail · Masuk desa ↓</div>`,
                 { sticky: true, direction: "center", className: "adm-map-tooltip", opacity: 0.98 }
               );
               lyr.on({
@@ -448,6 +630,33 @@ export default function Dashboard() {
                 },
                 click: () => {
                   setKecSelected(kecName);
+                  setKecKode(String(feature.properties?.KODE_KEC ?? feature.properties?.FID ?? "") || null);
+                  // auto drill-down: klik kecamatan langsung pecah ke desa
+                  void (async () => {
+                    try {
+                      const kk = String(feature.properties?.KODE_KEC ?? feature.properties?.FID ?? "");
+                      const kn = String(feature.properties?.KECAMATAN ?? "");
+                      const kabOf = String(feature.properties?.KAB_KOTA ?? "");
+                      setDesaLoading(true);
+                      setDesaSelected(null);
+                      setDesaKode(null);
+                      setDesaRincian(null);
+                      setDesaRincianError(null);
+                      const base = apiBase();
+                      const qs = kk
+                        ? `kode_kec=${encodeURIComponent(kk)}`
+                        : `kecamatan=${encodeURIComponent(kn)}&kab_kota=${encodeURIComponent(kabOf)}`;
+                      const res = await fetch(`${base}/api/geo/desa?${qs}`, { cache: "no-store" });
+                      if (!res.ok) throw new Error(`Gagal memuat desa (${res.status})`);
+                      const gj = await res.json();
+                      setDesaGeo(gj);
+                      setLevel("desa");
+                    } catch (e: unknown) {
+                      setDesaRincianError(e instanceof Error ? e.message : String(e));
+                    } finally {
+                      setDesaLoading(false);
+                    }
+                  })();
                 },
               });
               return;
@@ -482,8 +691,14 @@ export default function Dashboard() {
                   try {
                     setKecLoading(true);
                     setKecSelected(null);
+                    setKecKode(null);
                     setKecRincian(null);
                     setKecRincianError(null);
+                    setDesaGeo(null);
+                    setDesaSelected(null);
+                    setDesaKode(null);
+                    setDesaRincian(null);
+                    setDesaRincianError(null);
                     const base = apiBase();
                     const qs = `kab_kota=${encodeURIComponent(kabName)}`;
                     const res = await fetch(`${base}/api/geo/kecamatan?${qs}`, { cache: "no-store" });
@@ -501,7 +716,15 @@ export default function Dashboard() {
               },
             });
           },
-        }).addTo(map);
+        });
+
+        // init basi (mis. klik cepat kab→kec→desa): jangan sentuh map
+        // (penyebab "Cannot read properties of undefined (reading 'appendChild')").
+        if (isStale()) return;
+        // replace layer lama — map & basemap tetap (tidak remove/create map)
+        try { geoRef.current?.removeFrom(activeMap); } catch { /* abaikan */ }
+        try { maskRef.current?.removeFrom(activeMap); } catch { /* abaikan */ }
+        layer.addTo(activeMap);
 
         const outerRing: [number, number][] = [
           [-180, 90],
@@ -538,14 +761,17 @@ export default function Dashboard() {
             interactive: false,
           } as import("leaflet").PathOptions,
           interactive: false,
-        }).addTo(map);
+        }).addTo(activeMap);
+        maskRef.current = mask as any;
         mask.bringToBack();
         layer.bringToFront();
-
+        if (isStale()) return;
         geoRef.current = layer as any;
-        // batas & zoom: level kec -> zoom ke kumpulan kecamatan terpilih (pecah sesuai kab), bukan provinsi penuh
+        // batas & zoom: level desa -> zoom ke kumpulan desa; kec -> kecamatan; kab -> provinsi/dapil
         let targetBounds: import("leaflet").LatLngBounds;
-        if (level === "kec" && kecGeo?.features?.length) {
+        if (level === "desa" && desaGeo?.features?.length) {
+          targetBounds = L.geoJSON(desaGeo as any).getBounds();
+        } else if (level === "kec" && kecGeo?.features?.length) {
           targetBounds = L.geoJSON(kecGeo as any).getBounds();
         } else {
           const provinceGeoJson: import("geojson").FeatureCollection = {
@@ -567,22 +793,21 @@ export default function Dashboard() {
           features: jatengFeatures,
         };
         const provinceBounds = L.geoJSON(provinceGeoJson2).getBounds();
-        map.fitBounds(targetBounds, { padding: level === "kec" ? [28, 28] : [48, 48], maxZoom: level === "kec" ? 12 : 9 });
-        map.setMinZoom(map.getZoom() - 1);
-        map.setMaxBounds(provinceBounds.pad(0.25));
-        setTimeout(() => map.invalidateSize(), 180);
-        map.on("moveend", () => {
-          const b = provinceBounds.pad(0.25);
-          if (!b.contains(map.getCenter())) map.panInsideBounds(b, { animate: true });
-        });
+        activeMap.fitBounds(targetBounds, { padding: level === "desa" ? [24, 24] : level === "kec" ? [28, 28] : [48, 48], maxZoom: level === "desa" ? 14 : level === "kec" ? 12 : 9 });
+        activeMap.setMinZoom(activeMap.getZoom() - 1);
+        activeMap.setMaxBounds(provinceBounds.pad(0.25));
+        setTimeout(() => { try { activeMap.invalidateSize(); } catch { /* abaikan */ } }, 180);
         setMapReady(true);
         const mapErr = document.getElementById("map-error");
         if (mapErr) mapErr.hidden = true;
-        if (level === "kec" && kecGeo?.features?.length) {
+        if (level === "desa" && desaGeo?.features?.length) {
+          // sudah di-zoom ke desa, tidak perlu focus lagi
+        } else if (level === "kec" && kecGeo?.features?.length) {
           // sudah di-zoom ke kec, tidak perlu focus kab lagi
         } else if (isKabKota && regions.length === 1) setTimeout(() => focusRegionByName(regions[0].name), 400);
         else if (detailRegion) setTimeout(() => focusRegionByName(detailRegion.name), 400);
       } catch (e: unknown) {
+        if (isStale()) return;
         const msg = e instanceof Error ? e.message : String(e);
         const isFetchFail = /failed to fetch|networkerror|load failed/i.test(msg);
         const el = document.getElementById("map-error");
@@ -595,13 +820,53 @@ export default function Dashboard() {
       }
     }
     void init();
-    return () => { cancelled = true; mapRef.current?.remove(); mapRef.current = null; geoRef.current = null; };
+    // cleanup: JANGAN remove map di sini (StrictMode double-invoke akan
+    // menghancurkan map milik init kedua → pane undefined → appendChild error).
+    // Map dibersihkan hanya saat unmount halaman (authChecked false / navigasi).
+    return () => { cancelled = true; };
+    // NOTE: kecSelected/desaSelected/desaKode TIDAK masuk dep — seleksi cukup re-style via effect di bawah
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authChecked, isScoped, regions.length, scopeKey, detailRegion?.name, membersMin, membersMax, level, kecGeo, kecSelected]);
+  }, [authChecked, isScoped, regions.length, scopeKey, detailRegion?.name, membersMin, membersMax, level, kecGeo, desaGeo]);
 
-  // re-style saat detailRegion/kecSelected berubah (selected highlight) + gradasi kecamatan
+  // re-style saat detailRegion/kecSelected/desaSelected berubah (selected highlight) + gradasi kecamatan/desa
   useEffect(() => {
     if (!geoRef.current) return;
+    if (level === "desa" && desaGeo) {
+      const features: any[] = desaGeo.features ?? [];
+      const desaCounts = new Map<string, number>();
+      for (const f of features) {
+        const nm = String(f.properties?.KEL_DESA ?? f.properties?.NAME ?? "").trim();
+        const kd = String(f.properties?.KODE_KD ?? "").trim();
+        const key = kd || nm;
+        if (!key) continue;
+        const kab = String(f.properties?.KAB_KOTA ?? "");
+        const reg = atlasRegions.find((r) => isSameKabKota(kab, r.name));
+        const base = reg ? reg.members : Math.round((membersMin + membersMax) / 2);
+        const nDesa = reg ? reg.desa : 200;
+        let h = 0;
+        for (let i = 0; i < nm.length; i++) h = (h * 31 + nm.charCodeAt(i)) % 100;
+        const v = Math.max(1, Math.round(base / nDesa + (h % 5) - 2));
+        desaCounts.set(key, v);
+      }
+      const vals = [...desaCounts.values()];
+      const kMin = vals.length ? Math.min(...vals) : membersMin;
+      const kMax = vals.length ? Math.max(...vals) : membersMax;
+      (geoRef.current as any).eachLayer((l: any) => {
+        const dn = String(l.feature?.properties?.KEL_DESA ?? l.feature?.properties?.NAME ?? "").trim();
+        const kd = String(l.feature?.properties?.KODE_KD ?? "").trim();
+        const isSel = desaKode ? kd === desaKode : desaSelected ? dn.toLowerCase() === desaSelected.toLowerCase() : false;
+        const v = desaCounts.get(kd || dn) ?? Math.round((kMin + kMax) / 2);
+        const fill = isSel ? "#1d4033" : fillForMembers(v, kMin, kMax);
+        l.setStyle({
+          color: isSel ? "#1d4033" : "#4a7a64",
+          weight: isSel ? 2 : 0.7,
+          opacity: 1,
+          fillColor: fill,
+          fillOpacity: isSel ? 0.6 : 0.45,
+        } as any);
+      });
+      return;
+    }
     if (level === "kec" && kecGeo) {
       const features: any[] = kecGeo.features ?? [];
       const kecCounts = new Map<string, number>();
@@ -649,12 +914,22 @@ export default function Dashboard() {
         fillOpacity: isSel ? 0.52 : 0.36,
       } as any);
     });
-  }, [detailRegion, membersMin, membersMax, level, kecGeo, kecSelected]);
+  }, [detailRegion, membersMin, membersMax, level, kecGeo, kecSelected, desaGeo, desaSelected, desaKode]);
 
   function focusRegionByName(name: string) {
     const layer: any = geoRef.current;
     const map = mapRef.current;
     if (!layer || !map) return;
+    // level desa: fokus ke desa terpilih
+    if (level === "desa" && (desaSelected || desaKode)) {
+      let found: any = null;
+      layer.eachLayer((l: any) => {
+        const dn = String(l.feature?.properties?.KEL_DESA ?? l.feature?.properties?.NAME ?? "").trim();
+        const kd = String(l.feature?.properties?.KODE_KD ?? "").trim();
+        if ((desaKode && kd === desaKode) || (desaSelected && dn.toLowerCase() === desaSelected.toLowerCase())) found = l;
+      });
+      if (found) { found.bringToFront(); map.fitBounds(found.getBounds(), { padding: [44, 44], maxZoom: 14 }); found.openTooltip(); return; }
+    }
     // level kecamatan: fokus ke kecamatan, bukan kab
     if (level === "kec" && kecSelected) {
       let foundKec: any = null;
@@ -699,8 +974,14 @@ export default function Dashboard() {
     setLevel("kec");
     setKecLoading(true);
     setKecSelected(null);
+    setKecKode(null);
     setKecRincian(null);
     setKecRincianError(null);
+    setDesaGeo(null);
+    setDesaSelected(null);
+    setDesaKode(null);
+    setDesaRincian(null);
+    setDesaRincianError(null);
     try {
       const base = apiBase();
       const qs = `kab_kota=${encodeURIComponent(kabName)}`;
@@ -715,12 +996,55 @@ export default function Dashboard() {
       setKecLoading(false);
     }
   }
+  async function handleMasukDesa() {
+    // pecah kecamatan terpilih → desa (butuh KODE_KEC dari fitur kecamatan)
+    const kabName = detailRegion?.name ?? "";
+    if (!kecSelected) return;
+    setDesaLoading(true);
+    setDesaSelected(null);
+    setDesaKode(null);
+    setDesaRincian(null);
+    setDesaRincianError(null);
+    try {
+      const base = apiBase();
+      let qs: string;
+      if (kecKode) {
+        qs = `kode_kec=${encodeURIComponent(kecKode)}`;
+      } else {
+        qs = `kecamatan=${encodeURIComponent(kecSelected)}${kabName ? `&kab_kota=${encodeURIComponent(kabName)}` : ""}`;
+      }
+      const res = await fetch(`${base}/api/geo/desa?${qs}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`Gagal memuat desa (${res.status})`);
+      const gj = await res.json();
+      setDesaGeo(gj);
+      setLevel("desa");
+    } catch (e: unknown) {
+      setDesaRincianError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDesaLoading(false);
+    }
+  }
+  function handleKembaliKec() {
+    setLevel("kec");
+    setDesaSelected(null);
+    setDesaKode(null);
+    setDesaRincian(null);
+    setDesaRincianError(null);
+    setDesaGeo(null);
+    setDesaLoading(false);
+  }
   function handleKembaliKab() {
     setLevel("kab");
     setKecSelected(null);
+    setKecKode(null);
     setKecRincian(null);
     setKecRincianError(null);
     setKecGeo(null);
+    setDesaSelected(null);
+    setDesaKode(null);
+    setDesaRincian(null);
+    setDesaRincianError(null);
+    setDesaGeo(null);
   }
 
   function handleSelectRegion(r: AtlasRegion) {
@@ -731,6 +1055,17 @@ export default function Dashboard() {
   }
 
   function handleReset() {
+    setLevel("kab");
+    setKecGeo(null);
+    setKecSelected(null);
+    setKecKode(null);
+    setKecRincian(null);
+    setKecRincianError(null);
+    setDesaGeo(null);
+    setDesaSelected(null);
+    setDesaKode(null);
+    setDesaRincian(null);
+    setDesaRincianError(null);
     setRegionQuery("");
     setMemberQuery("");
     setRegionBoxOpen(false);
@@ -943,10 +1278,16 @@ export default function Dashboard() {
 
           <section className="map-section" id="map-section">
             <div className="section-heading">
-              <div><p className="eyebrow">01 / PETA WILAYAH</p><h2>Jawa Tengah <span id="map-heading-suffix">{level === "kec" && detailRegion ? `di Kec. ${kecSelected ?? "—"} — ${detailRegion.name}.` : detailRegion ? `di ${detailRegion.name}.` : isScoped ? `di ${selectedDapilLabel}.` : "secara keseluruhan."}</span></h2></div>
+              <div><p className="eyebrow">01 / PETA WILAYAH</p><h2>Jawa Tengah <span id="map-heading-suffix">{level === "desa" && detailRegion ? `di Desa ${desaSelected ?? "—"} — Kec. ${kecSelected ?? "—"} — ${detailRegion.name}.` : level === "kec" && detailRegion ? `di Kec. ${kecSelected ?? "—"} — ${detailRegion.name}.` : detailRegion ? `di ${detailRegion.name}.` : isScoped ? `di ${selectedDapilLabel}.` : "secara keseluruhan."}</span></h2></div>
               <div className="map-legend map-legend-grad" aria-label="Legenda gradiasi anggota">
                 <div className="map-legend-bar" title="Gradiasi: terang=rendah, gelap=tinggi" aria-hidden />
-                {level === "kec" ? (
+                {level === "desa" ? (
+                  <>
+                    <span><i className="legend-low" /> rendah (desa)</span>
+                    <span><i className="legend-high" /> tinggi (desa)</span>
+                    <small>skala Kec. {kecSelected ?? detailRegion?.name ?? "—"}</small>
+                  </>
+                ) : level === "kec" ? (
                   <>
                     <span><i className="legend-low" /> rendah (kec)</span>
                     <span><i className="legend-high" /> tinggi (kec)</span>
@@ -1001,10 +1342,18 @@ export default function Dashboard() {
                       {kecLoading ? "Memuat..." : "Masuk kecamatan ↓"}
                     </button>
                   )}
-                  {level === "kec" && (
+                  {level === "kec" && kecSelected && (
+                    <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={handleMasukDesa} disabled={desaLoading}>
+                      {desaLoading ? "Memuat..." : "Masuk desa ↓"}
+                    </button>
+                  )}
+                  {level === "desa" && (
+                    <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={handleKembaliKec}>← Kembali kecamatan</button>
+                  )}
+                  {(level === "kec" || level === "desa") && (
                     <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={handleKembaliKab}>← Kembali kab/kota</button>
                   )}
-                  <button id="zoom-region" type="button" onClick={() => { if (level === "kec" && kecSelected) { /* fokus kec sudah di useEffect */ } else if (detailRegion) focusRegionByName(detailRegion.name); else if (selectedDapilLabel) focusRegionByName(regions[0]?.name ?? ""); else { const l:any=geoRef.current; if(l) mapRef.current?.fitBounds(l.getBounds(), { padding:[18,18], maxZoom:9}); } }}>Fokus peta ↗</button>
+                  <button id="zoom-region" type="button" onClick={() => { if (level === "desa" && desaSelected) { focusRegionByName(desaSelected); } else if (level === "kec" && kecSelected) { /* fokus kec sudah di useEffect */ } else if (detailRegion) focusRegionByName(detailRegion.name); else if (selectedDapilLabel) focusRegionByName(regions[0]?.name ?? ""); else { const l:any=geoRef.current; if(l) mapRef.current?.fitBounds(l.getBounds(), { padding:[18,18], maxZoom:9}); } }}>Fokus peta ↗</button>
                 </div>
               </div>
               {level === "kec" && detailRegion && (
@@ -1012,6 +1361,17 @@ export default function Dashboard() {
                   <b style={{ color: "var(--green-dark)" }}>Mode kecamatan — {detailRegion.name}</b>
                   <span style={{ color: "var(--muted)", marginLeft: 8 }}>{kecGeo ? `${kecGeo.features?.length ?? 0} kecamatan` : kecLoading ? "memuat batas..." : ""}{kecSelected ? ` · terpilih: ${kecSelected}` : ""}</span>
                   {kecRincianError && <div className="form-error" style={{ marginTop: 8 }}>{kecRincianError}</div>}
+                </div>
+              )}
+              {level === "desa" && detailRegion && (
+                <div style={{ marginTop: 12, padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 10, background: "rgba(246,245,239,.7)", fontSize: 12 }}>
+                  <b style={{ color: "var(--green-dark)" }}>Mode desa — Kec. {kecSelected ?? "—"} · {detailRegion.name}</b>
+                  <span style={{ color: "var(--muted)", marginLeft: 8 }}>{desaGeo ? `${desaGeo.features?.length ?? 0} desa/kelurahan` : desaLoading ? "memuat batas..." : ""}{desaSelected ? ` · terpilih: ${desaSelected}` : ""}</span>
+                  {(desaRincianError || kecRincianError) && <div className="form-error" style={{ marginTop: 8 }}>{desaRincianError ?? kecRincianError}</div>}
+                  <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                    <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={handleKembaliKec}>← Kembali ke kecamatan</button>
+                    <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={handleKembaliKab}>← Kembali ke kab/kota</button>
+                  </div>
                 </div>
               )}
             </article>
@@ -1052,14 +1412,14 @@ export default function Dashboard() {
             </article>
           </section>
 
-          {/* 05 — Rincian kab/kota; 06 — Rincian kecamatan (drill-down) */}
+          {/* 05 — Rincian kab/kota; 06 — Rincian kecamatan (drill-down); 07 — Rincian desa (pecah kecamatan) */}
           <section className="rincian-section" id="rincian-wilayah" aria-label="Rincian wilayah terpilih">
             <div className="section-heading compact">
               <div><p className="eyebrow">05 / RINCIAN WILAYAH</p><h2>{detailRegion ? `Rincian ${detailRegion.name}` : selectedDapilLabel ? `Rincian ${selectedDapilLabel}` : "Rincian wilayah"}</h2></div>
               {rincian && <span className="type-tag">{n.format(rincian.total_partai)} partai · {n.format(rincian.jumlah_partai_ada)} ada</span>}
             </div>
             {!detailRegion ? (
-              <p className="detail-description">Klik kabupaten/kota di peta untuk melihat rincian: partai ada/tidak, jumlah pendukung / penggerak / pelopor (enum <b>ada / tidak</b>), jumlah partai, kepala desa, komunitas senam, dan tokoh partai. Lalu <b>Masuk kecamatan</b> untuk pecah sampai batas kecamatan.</p>
+              <p className="detail-description">Klik kabupaten/kota di peta untuk melihat rincian: partai ada/tidak, jumlah pendukung / penggerak / pelopor (enum <b>ada / tidak</b>), jumlah partai, kepala desa, komunitas senam, dan tokoh partai. Lalu <b>Masuk kecamatan</b> untuk pecah sampai batas kecamatan, lanjut <b>Masuk desa</b> sampai batas desa — statistik kota, kecamatan, dan desa tetap tampil utuh.</p>
             ) : rincianLoading ? (
               <p className="detail-description">Memuat rincian {detailRegion.name}...</p>
             ) : rincianError ? (
@@ -1146,7 +1506,7 @@ export default function Dashboard() {
             ) : null}
           </section>
 
-          {level === "kec" && detailRegion && (
+          {(level === "kec" || level === "desa") && detailRegion && (
             <section className="rincian-section" id="rincian-kecamatan" aria-label="Rincian kecamatan">
               <div className="section-heading compact">
                 <div><p className="eyebrow">06 / RINCIAN KECAMATAN</p><h2>{kecSelected ? `Kec. ${kecSelected} — ${detailRegion.name}` : `Kecamatan di ${detailRegion.name}`}</h2></div>
@@ -1161,7 +1521,7 @@ export default function Dashboard() {
                     {kecGeo.features.slice(0, 32).map((f: any) => {
                       const nm = String(f.properties?.KECAMATAN ?? "");
                       const kode = String(f.properties?.KODE_KEC ?? "");
-                      return <button key={kode || nm} type="button" onClick={() => setKecSelected(nm)} style={{ textAlign: "left", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 10, background: "#fff", fontSize: 12 }}><b>{nm}</b><small style={{ display: "block", color: "var(--muted)" }}>{kode}</small></button>;
+                      return <button key={kode || nm} type="button" onClick={() => { setKecSelected(nm); setKecKode(kode || null); }} style={{ textAlign: "left", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 10, background: "#fff", fontSize: 12 }}><b>{nm}</b><small style={{ display: "block", color: "var(--muted)" }}>{kode}</small></button>;
                     })}
                   </div>
                   {kecGeo.features.length > 32 && <small style={{ color: "var(--muted)", marginTop: 8, display: "block" }}>+{kecGeo.features.length - 32} kecamatan lainnya — klik di peta.</small>}
@@ -1202,8 +1562,80 @@ export default function Dashboard() {
                     <div className="rincian-row"><span>TOTAL TOKOH</span><strong>{n.format(kecRincian.tokoh_partai.total_tokoh)} tokoh</strong><i className={kecRincian.tokoh_partai.ada ? "is-ada" : "is-tidak"}>{kecRincian.tokoh_partai.enum_ada}</i></div>
                     {kecRincian.tokoh_partai.daftar.length > 0 && <ul className="rincian-list">{kecRincian.tokoh_partai.daftar.map((t: any) => <li key={t.id}><span className="rincian-pill subtle">{t.jenis_tokoh}</span><strong>{n.format(t.jumlah_tokoh)} tokoh</strong><small>{t.partai_nama ?? "—"}</small></li>)}</ul>}
                   </article>
-                  <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                    <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={() => setKecSelected(null)}>Pilih kecamatan lain</button>
+                  <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                    <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={() => { setKecSelected(null); setKecKode(null); }}>Pilih kecamatan lain</button>
+                    {kecSelected && (
+                      <button type="button" className="adm-btn adm-btn-sm" onClick={handleMasukDesa} disabled={desaLoading}>
+                        {desaLoading ? "Memuat desa..." : "Masuk desa ↓"}
+                      </button>
+                    )}
+                    <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={handleKembaliKab}>← Kembali ke kab/kota</button>
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          )}
+
+          {(level === "desa" || desaGeo) && detailRegion && kecSelected && (
+            <section className="rincian-section" id="rincian-desa" aria-label="Rincian desa">
+              <div className="section-heading compact">
+                <div><p className="eyebrow">07 / RINCIAN DESA</p><h2>{desaSelected ? `${desaSelected} — Kec. ${kecSelected}` : `Desa di Kec. ${kecSelected} — ${detailRegion.name}`}</h2></div>
+                <span className="type-tag">{desaGeo ? `${desaGeo.features?.length ?? 0} desa/kelurahan` : "—"} · {kecKode ?? "—"}</span>
+              </div>
+              {!desaGeo ? (
+                <p className="detail-description">{desaLoading ? "Memuat batas desa..." : "Memuat..."}</p>
+              ) : !desaSelected ? (
+                <div>
+                  <p className="detail-description">Klik salah satu desa di peta — statistik <b>{detailRegion.name}</b> (05) dan <b>Kec. {kecSelected}</b> (06) tetap tampil di atas.</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px,1fr))", gap: 8, marginTop: 10 }}>
+                    {desaGeo.features.slice(0, 32).map((f: any) => {
+                      const nm = String(f.properties?.KEL_DESA ?? f.properties?.NAME ?? "");
+                      const kode = String(f.properties?.KODE_KD ?? "");
+                      const jenis = String(f.properties?.JENIS_KD ?? "");
+                      return <button key={kode || nm} type="button" onClick={() => { setDesaSelected(nm); setDesaKode(kode || null); }} style={{ textAlign: "left", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 10, background: "#fff", fontSize: 12 }}><b>{nm}{jenis ? ` (${jenis})` : ""}</b><small style={{ display: "block", color: "var(--muted)" }}>{kode}</small></button>;
+                    })}
+                  </div>
+                  {desaGeo.features.length > 32 && <small style={{ color: "var(--muted)", marginTop: 8, display: "block" }}>+{desaGeo.features.length - 32} desa lainnya — klik di peta.</small>}
+                </div>
+              ) : desaRincianLoading ? (
+                <p className="detail-description">Memuat rincian {desaSelected}...</p>
+              ) : desaRincianError ? (
+                <div className="form-error" role="alert">Gagal memuat rincian desa: {desaRincianError} <button type="button" className="adm-btn adm-btn-sm" style={{ marginLeft: 8 }} onClick={() => { setDesaSelected(null); setDesaKode(null); }}>Pilih lain</button></div>
+              ) : desaRincian ? (
+                <div className="rincian-grid">
+                  <article className="rincian-card">
+                    <h3>{desaSelected} — partai</h3>
+                    <p className="rincian-meta">{desaRincian.jumlah_partai_ada} dari {desaRincian.total_partai} partai ada di desa ini {desaRincian.wilayah?.synthetic ? <em style={{ color: "var(--muted)" }}>(data sintetis — belum ada baris wilayah desa di DB)</em> : null}</p>
+                    <ul className="rincian-list">
+                      {desaRincian.partai.map((p: any) => (
+                        <li key={p.partai_id} className={p.ada ? "is-ada" : "is-tidak"}><span className="rincian-pill" data-ada={p.enum_ada}>{p.enum_ada}</span><strong>{p.partai_nama}</strong><small>{p.ada ? `${n.format(p.jumlah_pendukung)} pend · ${n.format(p.jumlah_penggerak)} penggerak · ${n.format(p.jumlah_pelopor)} pelopor` : "tidak ada"}</small></li>
+                      ))}
+                    </ul>
+                  </article>
+                  <article className="rincian-card">
+                    <h3>Peran desa — pendukung / penggerak / pelopor</h3>
+                    <div className="rincian-peran-grid">
+                      <div><span>PENDUKUNG</span><strong>{n.format(desaRincian.peran.total_pendukung)}</strong><i className={desaRincian.peran.ada_pendukung ? "is-ada" : "is-tidak"}>{desaRincian.peran.enum_pendukung}</i></div>
+                      <div><span>PENGGERAK</span><strong>{n.format(desaRincian.peran.total_penggerak)}</strong><i className={desaRincian.peran.ada_penggerak ? "is-ada" : "is-tidak"}>{desaRincian.peran.enum_penggerak}</i></div>
+                      <div><span>PELOPOR</span><strong>{n.format(desaRincian.peran.total_pelopor)}</strong><i className={desaRincian.peran.ada_pelopor ? "is-ada" : "is-tidak"}>{desaRincian.peran.enum_pelopor}</i></div>
+                    </div>
+                  </article>
+                  <article className="rincian-card">
+                    <h3>Kepala desa</h3>
+                    <div className="rincian-row"><span>KEPALA DESA</span><strong>{desaRincian.kepala_desa.jumlah} desa</strong><i className={desaRincian.kepala_desa.ada ? "is-ada" : "is-tidak"}>{desaRincian.kepala_desa.enum_ada}</i></div>
+                  </article>
+                  <article className="rincian-card">
+                    <h3>Komunitas senam</h3>
+                    <div className="rincian-row"><span>KOMUNITAS SENAM</span><strong>{n.format(desaRincian.komunitas_senam.total_komunitas)} komunitas</strong><i className={desaRincian.komunitas_senam.ada ? "is-ada" : "is-tidak"}>{desaRincian.komunitas_senam.enum_ada}</i></div>
+                  </article>
+                  <article className="rincian-card rincian-span-2">
+                    <h3>Tokoh partai</h3>
+                    <div className="rincian-row"><span>TOTAL TOKOH</span><strong>{n.format(desaRincian.tokoh_partai.total_tokoh)} tokoh</strong><i className={desaRincian.tokoh_partai.ada ? "is-ada" : "is-tidak"}>{desaRincian.tokoh_partai.enum_ada}</i></div>
+                    {desaRincian.tokoh_partai.daftar.length > 0 && <ul className="rincian-list">{desaRincian.tokoh_partai.daftar.map((t: any) => <li key={t.id}><span className="rincian-pill subtle">{t.jenis_tokoh}</span><strong>{n.format(t.jumlah_tokoh)} tokoh</strong><small>{t.partai_nama ?? "—"}</small></li>)}</ul>}
+                  </article>
+                  <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                    <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={() => { setDesaSelected(null); setDesaKode(null); }}>Pilih desa lain</button>
+                    <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={handleKembaliKec}>← Kembali ke kecamatan</button>
                     <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" onClick={handleKembaliKab}>← Kembali ke kab/kota</button>
                   </div>
                 </div>

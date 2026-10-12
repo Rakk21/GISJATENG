@@ -16,6 +16,7 @@ from app.api.routes.analisis import router as analisis_router
 from app.api.routes.export_data import router as export_router
 from app.api.routes.wilayah_rincian import router as wilayah_rincian_router
 from app.api.routes.geo_kecamatan import router as geo_kecamatan_router
+from app.api.routes.geo_desa import router as geo_desa_router
 
 
 app = FastAPI(
@@ -46,6 +47,7 @@ app.include_router(suara_router)
 app.include_router(anggota_router)
 app.include_router(wilayah_rincian_router)
 app.include_router(geo_kecamatan_router)
+app.include_router(geo_desa_router)
 
 @app.get("/")
 def root():

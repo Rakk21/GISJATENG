@@ -11,6 +11,18 @@ class WilayahResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class WilayahSearchResult(BaseModel):
+    id: int
+    kode_kemendagri: str
+    nama: str
+    tingkat: str
+    parent_id: int | None
+    parent_nama: str | None = None
+    parent_tingkat: str | None = None
+    breadcrumb: str
+    dapil_ids: list[int] = []
+
+
 class WilayahCreate(BaseModel):
     kode_kemendagri: str
     nama: str

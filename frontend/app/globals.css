@@ -1023,3 +1023,4 @@ button, input { font: inherit; }
 .auth-secondary-link{margin-top:8px}
 .check-row{ display:flex !important; flex-direction: row !important; align-items:center; gap:8px; font: 500 11px 'Manrope',sans-serif !important; text-transform: none !important; cursor:pointer}
 .check-row input{ width:auto}
+@keyframes spin{ from{ transform: rotate(0deg)} to{ transform: rotate(360deg)} }
