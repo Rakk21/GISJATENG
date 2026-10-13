@@ -5,9 +5,8 @@ Dashboard WebGIS untuk menjelajahi batas administratif Jawa Tengah, mencari wila
 ## Struktur proyek
 
 ```text
-app/          Halaman, UI dashboard, API proxy, dan stylesheet Next.js
+frontend/     Aplikasi Next.js (halaman, komponen, lib, aset publik + GeoJSON)
 backend/      API FastAPI, model database, skema, dan migrasi Alembic
-public/       Aset publik, termasuk GeoJSON kabupaten/kota Jawa Tengah
 tests/        Tes aset peta dan dashboard
 ```
 
@@ -37,4 +36,4 @@ npm run lint
 npm test
 ```
 
-Peta saat ini menggunakan geometri kabupaten/kota dari GeoJSON di `public/`. Dataset anggota, suara, dan penduduk belum menjadi data backend; mode Admin menerima CSV sebagai pratinjau sementara di browser, bukan penyimpanan permanen.
+Peta saat ini menggunakan geometri kabupaten/kota dari GeoJSON di `frontend/public/`. Dataset anggota, suara, dan penduduk belum menjadi data backend; mode Admin menerima CSV sebagai pratinjau sementara di browser, bukan penyimpanan permanen.

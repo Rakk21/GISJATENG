@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { PageHeader } from "@/components/admin/PageHeader";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { TableWrap, Th, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";

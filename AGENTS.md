@@ -66,11 +66,11 @@ The frontend is responsible for:
 
 Static GeoJSON files are stored under:
 
-`public/geojson/`
+`frontend/public/geojson/`
 
 Example:
 
-`public/geojson/kota.geojson`
+`frontend/public/geojson/kota.geojson`
 
 Do not move or duplicate GeoJSON files unless explicitly requested.
 

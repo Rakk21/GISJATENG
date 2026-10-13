@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("Jawa Tengah boundary data contains 35 named regions", async () => {
-  const source = new URL("../public/kabupaten-jawa-tengah.geojson", import.meta.url);
+  const source = new URL("../frontend/public/kabupaten-jawa-tengah.geojson", import.meta.url);
   const data = JSON.parse(await readFile(source, "utf8"));
 
   assert.equal(data.type, "FeatureCollection");

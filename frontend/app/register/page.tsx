@@ -96,7 +96,7 @@ export default function RegisterPage() {
               <div className="scope-panel" hidden={isKab}>
                 <label>Nomor dapil
                   <select value={dapilNumber} onChange={(e) => setDapilNumber(e.target.value)} required={!isKab}>
-                    <option value="">Pilih nomor</option>
+                    <option value="">Pilih Dapil</option>
                     {Array.from({ length: maxNum }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </label>
