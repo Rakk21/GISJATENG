@@ -33,7 +33,7 @@ def ringkasan(db: Session = Depends(get_db), current: Pengguna = Depends(get_cur
         if len(aw) == 0:
             return {"wilayah": 0, "total_penduduk": 0, "total_pemilih": 0, "total_suara": 0, "total_anggota": 0, "scope": "tidak ada dapil"}
         scope_filter = aw
-    wilayah_cnt = db.execute(select(func.count()).select_from(Wilayah).where(Wilayah.wilayah_id.in_(scope_filter)) if scope_filter is not None else select(func.count()).select_from(Wilayah)).scalar()
+    wilayah_cnt = db.execute(select(func.count()).select_from(Wilayah).where(Wilayah.id.in_(scope_filter)) if scope_filter is not None else select(func.count()).select_from(Wilayah)).scalar()
     # simpler: count via filtered queries
     def sum_col(model, col, field_wilayah="wilayah_id"):
         q = select(func.coalesce(func.sum(col), 0))

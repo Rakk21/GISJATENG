@@ -64,7 +64,21 @@ def list_suara_admin(db: Session = Depends(get_db), current: Pengguna = Depends(
 
 
 @router.post("/", response_model=SuaraPartaiResponse, status_code=201)
-def create_suara(payload: SuaraPartaiCreate, db: Session = Depends(get_db)):
+def create_suara(
+    payload: SuaraPartaiCreate,
+    db: Session = Depends(get_db),
+    current: Pengguna = Depends(get_current_user),
+):
+    aw = _allowed_suara(db, current)
+    if aw is not None:
+        if len(aw) == 0:
+            raise HTTPException(status_code=403, detail="Tidak punya akses ke dapil ini")
+        if payload.wilayah_id not in aw:
+            raise HTTPException(status_code=403, detail="Tidak punya akses ke dapil ini")
+    if not db.get(Wilayah, payload.wilayah_id):
+        raise HTTPException(status_code=404, detail="Wilayah tidak ditemukan")
+    if not db.get(Partai, payload.partai_id):
+        raise HTTPException(status_code=404, detail="Partai tidak ditemukan")
     row = SuaraPartai(**payload.model_dump())
     db.add(row)
     db.commit()
@@ -73,10 +87,19 @@ def create_suara(payload: SuaraPartaiCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{row_id}", response_model=SuaraPartaiResponse)
-def update_suara(row_id: int, payload: SuaraPartaiUpdate, db: Session = Depends(get_db)):
+def update_suara(
+    row_id: int,
+    payload: SuaraPartaiUpdate,
+    db: Session = Depends(get_db),
+    current: Pengguna = Depends(get_current_user),
+):
     row = db.get(SuaraPartai, row_id)
     if not row:
         raise HTTPException(status_code=404, detail="Data tidak ditemukan")
+    aw = _allowed_suara(db, current)
+    if aw is not None:
+        if len(aw) == 0 or row.wilayah_id not in aw:
+            raise HTTPException(status_code=403, detail="Tidak punya akses ke dapil ini")
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(row, k, v)
     db.commit()
@@ -85,9 +108,17 @@ def update_suara(row_id: int, payload: SuaraPartaiUpdate, db: Session = Depends(
 
 
 @router.delete("/{row_id}", status_code=204)
-def delete_suara(row_id: int, db: Session = Depends(get_db)):
+def delete_suara(
+    row_id: int,
+    db: Session = Depends(get_db),
+    current: Pengguna = Depends(get_current_user),
+):
     row = db.get(SuaraPartai, row_id)
     if not row:
         raise HTTPException(status_code=404, detail="Data tidak ditemukan")
+    aw = _allowed_suara(db, current)
+    if aw is not None:
+        if len(aw) == 0 or row.wilayah_id not in aw:
+            raise HTTPException(status_code=403, detail="Tidak punya akses ke dapil ini")
     db.delete(row)
     db.commit()

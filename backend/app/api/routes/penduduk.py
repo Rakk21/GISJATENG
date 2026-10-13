@@ -66,7 +66,19 @@ def list_penduduk_admin(db: Session = Depends(get_db), current: Pengguna = Depen
 
 
 @router.post("/", response_model=PendudukResponse, status_code=201)
-def create_penduduk(payload: PendudukCreate, db: Session = Depends(get_db)):
+def create_penduduk(
+    payload: PendudukCreate,
+    db: Session = Depends(get_db),
+    current: Pengguna = Depends(get_current_user),
+):
+    aw = _allowed_ids(db, current)
+    if aw is not None:
+        if len(aw) == 0:
+            raise HTTPException(status_code=403, detail="Tidak punya akses ke dapil ini")
+        if payload.wilayah_id not in aw:
+            raise HTTPException(status_code=403, detail="Tidak punya akses ke dapil ini")
+    if not db.get(Wilayah, payload.wilayah_id):
+        raise HTTPException(status_code=404, detail="Wilayah tidak ditemukan")
     row = Penduduk(**payload.model_dump())
     db.add(row)
     db.commit()
@@ -75,10 +87,19 @@ def create_penduduk(payload: PendudukCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{row_id}", response_model=PendudukResponse)
-def update_penduduk(row_id: int, payload: PendudukUpdate, db: Session = Depends(get_db)):
+def update_penduduk(
+    row_id: int,
+    payload: PendudukUpdate,
+    db: Session = Depends(get_db),
+    current: Pengguna = Depends(get_current_user),
+):
     row = db.get(Penduduk, row_id)
     if not row:
         raise HTTPException(status_code=404, detail="Data tidak ditemukan")
+    aw = _allowed_ids(db, current)
+    if aw is not None:
+        if len(aw) == 0 or row.wilayah_id not in aw:
+            raise HTTPException(status_code=403, detail="Tidak punya akses ke dapil ini")
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(row, k, v)
     db.commit()
@@ -87,9 +108,17 @@ def update_penduduk(row_id: int, payload: PendudukUpdate, db: Session = Depends(
 
 
 @router.delete("/{row_id}", status_code=204)
-def delete_penduduk(row_id: int, db: Session = Depends(get_db)):
+def delete_penduduk(
+    row_id: int,
+    db: Session = Depends(get_db),
+    current: Pengguna = Depends(get_current_user),
+):
     row = db.get(Penduduk, row_id)
     if not row:
         raise HTTPException(status_code=404, detail="Data tidak ditemukan")
+    aw = _allowed_ids(db, current)
+    if aw is not None:
+        if len(aw) == 0 or row.wilayah_id not in aw:
+            raise HTTPException(status_code=403, detail="Tidak punya akses ke dapil ini")
     db.delete(row)
     db.commit()

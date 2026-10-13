@@ -218,20 +218,30 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [expanded, setExpanded] = useState<string | null>("Data Wilayah");
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Login page — render without shell
-  if (pathname === "/admin/login") {
-    return <>{children}</>;
-  }
+  // Login page — render without shell.
+  // NOTE: dihitung sebagai flag, JANGAN early-return di sini —
+  // semua hooks di bawah harus terpanggil dengan urutan sama di tiap render.
+  const isLoginPage = pathname === "/admin/login";
 
   useEffect(() => {
+    if (isLoginPage) return;
+    let cancelled = false;
     const token = getToken();
     if (!token) {
       router.replace("/login");
-      setAuthChecked(true);
-      return;
+      // setState di callback (bukan sinkron di body effect) —
+      // sinkron setState di effect memicu react-hooks/set-state-in-effect
+      // dan cascade render yang tidak perlu.
+      void Promise.resolve().then(() => {
+        if (!cancelled) setAuthChecked(true);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
     fetchMe()
       .then((m) => {
+        if (cancelled) return;
         if (!m) {
           clearToken();
           router.replace("/login");
@@ -239,8 +249,18 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           setMe(m);
         }
       })
-      .finally(() => setAuthChecked(true));
-  }, [pathname, router]);
+      .finally(() => {
+        if (!cancelled) setAuthChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, router, isLoginPage]);
+
+  // Login page — tanpa shell, setelah semua hooks terpanggil
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
   if (!authChecked) {
     return (
